@@ -182,13 +182,11 @@ def convert_coco_polygons_to_mask(polygons, height, width):
 
 def resize_preserve_aspect_ratio(image, max_side=512):
     width, height = image.size
-    if width > height:
-        new_width = max_side
-        new_height = int(height * (max_side / width))
-    else:
-        new_height = max_side
-        new_width = int(width * (max_side / height))
+    scale = min(max_side/width, max_side/height)
+    new_width = int(width * scale)
+    new_height = int(height * scale)
     return image.resize((new_width, new_height))
+
 
 
 def overlay_mask(image, mask, opacity=0.5):
