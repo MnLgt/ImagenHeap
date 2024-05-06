@@ -133,7 +133,8 @@ def get_coco_style_polygons(mask):
 
 def convert_coco_to_yolo_polygons(coco_polygons, image_width, image_height):
     """
-    Converts COCO style polygons to normalized YOLO style format.
+    Converts COCO style polygons to a normalized YOLO style format, outputting a single list
+    of coordinates.
 
     Parameters:
     - coco_polygons: List of polygons, each represented as a flat list of points.
@@ -141,20 +142,16 @@ def convert_coco_to_yolo_polygons(coco_polygons, image_width, image_height):
     - image_height: The height of the original image.
 
     Returns:
-    - List of polygons in YOLO format, normalized by the image dimensions.
+    - List of coordinates in YOLO format, normalized by the image dimensions and flattened into a single list.
     """
-    yolo_polygons = []
+    yolo_coordinates = []
     for polygon in coco_polygons:
-        normalized_coordinates = []
         for i in range(0, len(polygon), 2):
             x_normalized = polygon[i] / image_width
             y_normalized = polygon[i + 1] / image_height
-            normalized_coordinates.extend([x_normalized, y_normalized])
+            yolo_coordinates.extend([x_normalized, y_normalized])
 
-        if len(normalized_coordinates) >= 6:  # Ensure there are at least 3 points
-            yolo_polygons.append(normalized_coordinates)
-
-    return yolo_polygons
+    return yolo_coordinates
 
 
 def convert_coco_polygons_to_mask(polygons, height, width):

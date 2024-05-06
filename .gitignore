@@ -42,7 +42,6 @@ datasets/*
 human_parsing/
 wandb/
 weights/
-archive/
 logs/*
 venv/
 
