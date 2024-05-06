@@ -41,3 +41,8 @@ fi
 echo "Registering Venv"
 pip install ipykernel ipywidgets
 python -m ipykernel install --user --name groundingdino
+
+echo "Adding git --global config"
+git config --global credential.helper store
+git config --global user.name "jordan davis"
+git config --global user.email "jordandavis16@gmail.com"
