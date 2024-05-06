@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import numpy as np
 import cv2
+from torchvision.transforms import functional as F
 
 
 import numpy as np
@@ -182,11 +183,10 @@ def convert_coco_polygons_to_mask(polygons, height, width):
 
 def resize_preserve_aspect_ratio(image, max_side=512):
     width, height = image.size
-    scale = min(max_side/width, max_side/height)
+    scale = min(max_side / width, max_side / height)
     new_width = int(width * scale)
     new_height = int(height * scale)
     return image.resize((new_width, new_height))
-
 
 
 def overlay_mask(image, mask, opacity=0.5):
@@ -216,3 +216,16 @@ def overlay_mask(image, mask, opacity=0.5):
 
     # Convert the result back to the original mode and return it
     return result.convert(image.mode)
+
+
+def pad_to_fixed_size(img, size=(640, 640)):
+    width, height = img.size
+    # Calculate padding
+    left = (size[0] - width) // 2
+    top = (size[1] - height) // 2
+    right = size[0] - width - left
+    bottom = size[1] - height - top
+
+    # Apply padding
+    img_padded = F.pad(img, padding=(left, top, right, bottom))
+    return img_padded

@@ -1,64 +1,35 @@
 import os
 
 os.environ["CUDA_HOME"] = "/usr/local/cuda-12.0"
-import random
+
 import warnings
+from functools import lru_cache
+import numpy as np
+import torchvision
+from segment_anything.utils.transforms import ResizeLongestSide
 
 warnings.filterwarnings(action="ignore", category=UserWarning)
 warnings.filterwarnings(action="ignore", category=FutureWarning)
-import argparse
-from diffusers.utils import make_image_grid
+
 import numpy as np
+
+# diffusers
 import torch
 import torchvision
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image
+
+# segment anything
+from segment_anything import SamPredictor, build_sam
+from segment_anything.utils.transforms import ResizeLongestSide
 
 # Grounding DINO
-import GroundingDINO.groundingdino.datasets.transforms as T
 from GroundingDINO.groundingdino.models import build_model
+import GroundingDINO.groundingdino.datasets.transforms as T
 from GroundingDINO.groundingdino.util.slconfig import SLConfig
 from GroundingDINO.groundingdino.util.utils import (
     clean_state_dict,
     get_phrases_from_posmap,
 )
-
-# segment anything
-from segment_anything import build_sam, SamPredictor
-import numpy as np
-
-# diffusers
-import torch
-
-# BLIP
-from transformers import BlipProcessor, BlipForConditionalGeneration
-
-config_file = "GroundingDINO/groundingdino/config/GroundingDINO_SwinT_OGC.py"
-ckpt_repo_id = "ShilongLiu/GroundingDINO"
-
-
-ckpt_filename = "weights/groundingdino_swint_ogc.pth"
-sam_checkpoint = "weights/sam_vit_h_4b8939.pth"
-output_dir = "outputs"
-device = "cuda" if torch.cuda.is_available() else "cpu"
-
-
-blip_processor = None
-blip_model = None
-groundingdino_model = None
-sam_predictor = None
-
-
-def transform_image(image_pil):
-
-    transform = T.Compose(
-        [
-            T.RandomResize([800], max_size=1333),
-            T.ToTensor(),
-            T.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
-        ]
-    )
-    image, _ = transform(image_pil, None)  # 3, h, w
-    return image
 
 
 def load_model(model_config_path, model_checkpoint_path, device):
@@ -74,182 +45,228 @@ def load_model(model_config_path, model_checkpoint_path, device):
     return model
 
 
-def get_grounding_output(
-    model, image, caption, box_threshold, text_threshold, with_logits=True
-):
+device = "cuda" if torch.cuda.is_available() else "cpu"
+
+
+ckpt_repo_id = "ShilongLiu/GroundingDINO"
+
+
+@lru_cache(maxsize=1)
+def get_grounding_model():
+    ckpt_filename = "weights/groundingdino_swint_ogc.pth"
+    config_file = "GroundingDINO/groundingdino/config/GroundingDINO_SwinT_OGC.py"
+    groundingdino_model = load_model(config_file, ckpt_filename, device=device).to(
+        device
+    )
+    return groundingdino_model.to(device)
+
+
+@lru_cache(maxsize=1)
+def get_sam_model():
+    sam_checkpoint = "weights/sam_vit_h_4b8939.pth"
+    # SAM PREDICTOR
+    sam = build_sam(checkpoint=sam_checkpoint)
+    return sam.to(device=device)
+
+
+model = get_grounding_model()
+sam = get_sam_model()
+
+# DEFAULT THRESHOLDS
+box_threshold = 0.3
+text_threshold = 0.25
+iou_threshold = 0.8
+
+
+def caption_handler(caption, images):
+    # Preprocess captions: lowercase, strip spaces, and ensure ending with a period
     caption = caption.lower()
     caption = caption.strip()
     if not caption.endswith("."):
         caption = caption + "."
 
+    # multiply the captions for the number of images
+    processed_captions = [caption] * len(images)
+    return processed_captions
+
+
+def transform_image_dino(image_pil):
+
+    transform = T.Compose(
+        [
+            T.ToTensor(),
+            T.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+        ]
+    )
+    image, _ = transform(image_pil, None)  # 3, h, w
+    return image
+
+
+def run_dino(images, caption, **kwargs):
+    processed_captions = caption_handler(caption, images)
+
+    # Ensure images is a batch (first dimension is batch size)
+    if len(images.shape) == 3:
+        images = images.unsqueeze(0)
+
     with torch.no_grad():
-        outputs = model(image[None], captions=[caption])
-    logits = outputs["pred_logits"].cpu().sigmoid()[0]  # (nq, 256)
-    boxes = outputs["pred_boxes"].cpu()[0]  # (nq, 4)
-    logits.shape[0]
+        # Obtain model outputs for the batch of images and captions
+        outputs = model(images, captions=processed_captions)
 
-    # filter output
-    logits_filt = logits.clone()
-    boxes_filt = boxes.clone()
-    filt_mask = logits_filt.max(dim=1)[0] > box_threshold
-    logits_filt = logits_filt[filt_mask]  # num_filt, 256
-    boxes_filt = boxes_filt[filt_mask]  # num_filt, 4
-    logits_filt.shape[0]
+    prediction_logits = (
+        outputs["pred_logits"].cpu().sigmoid()
+    )  # prediction_logits.shape = (num_batch, nq, 256)
+    prediction_boxes = outputs[
+        "pred_boxes"
+    ].cpu()  # prediction_boxes.shape = (num_batch, nq, 4)
 
-    # get phrase
-    tokenlizer = model.tokenizer
-    tokenized = tokenlizer(caption)
-    # build pred
-    pred_phrases = []
-    scores = []
-    for logit, box in zip(logits_filt, boxes_filt):
-        pred_phrase = get_phrases_from_posmap(
-            logit > text_threshold, tokenized, tokenlizer
+    # import ipdb; ipdb.set_trace()
+    mask = (
+        prediction_logits.max(dim=2)[0] > box_threshold
+    )  # mask: torch.Size([num_batch, 256])
+
+    bboxes_batch = []
+    predicts_batch = []
+    phrases_batch = []  # list of lists
+    tokenizer = model.tokenizer
+    tokenized = tokenizer(caption)
+    for i in range(prediction_logits.shape[0]):
+        logits = prediction_logits[i][mask[i]]  # logits.shape = (n, 256)
+        phrases = [
+            get_phrases_from_posmap(
+                logit == torch.max(logit), tokenized, tokenizer
+            ).replace(".", "")
+            for logit in logits  # logit is a tensor of shape (256,) torch.Size([256])  # torch.Size([7, 256])
+        ]
+        boxes = prediction_boxes[i][mask[i]]  # boxes.shape = (n, 4)
+        phrases_batch.append(phrases)
+        bboxes_batch.append(boxes)
+        predicts_batch.append(logits.max(dim=1)[0])
+
+    return bboxes_batch, predicts_batch, phrases_batch
+
+
+def format_dino(
+    batch_boxes_filt, batch_scores, batch_pred_phrases, image_size=(1024, 1024)
+):
+    batch_final_boxes = []
+    batch_final_scores = []
+    batch_final_phrases = []
+
+    # Process each item in the batch
+    for boxes_filt, scores, pred_phrases in zip(
+        batch_boxes_filt, batch_scores, batch_pred_phrases
+    ):
+        # Adjust box coordinates based on image size
+        H, W = image_size[1], image_size[0]
+        for i in range(boxes_filt.size(0)):
+            boxes_filt[i] = boxes_filt[i] * torch.Tensor([W, H, W, H])
+            boxes_filt[i][:2] -= boxes_filt[i][2:] / 2
+            boxes_filt[i][2:] += boxes_filt[i][:2]
+
+        # Non-maximum suppression (NMS)
+        nms_idx = (
+            torchvision.ops.nms(boxes_filt, scores, iou_threshold).numpy().tolist()
         )
-        if with_logits:
-            pred_phrases.append(pred_phrase + f"({str(logit.max().item())[:4]})")
-        else:
-            pred_phrases.append(pred_phrase)
-        scores.append(logit.max().item())
+        final_boxes = boxes_filt[nms_idx]
+        final_scores = scores[nms_idx]
+        final_phrases = [pred_phrases[idx] for idx in nms_idx]
 
-    return boxes_filt, torch.Tensor(scores), pred_phrases
+        # Collect results for this batch element
+        batch_final_boxes.append(final_boxes)
+        batch_final_scores.append(final_scores)
+        batch_final_phrases.append(final_phrases)
 
-
-def draw_mask(mask, draw, random_color=True):
-    if random_color:
-        color = (
-            random.randint(0, 255),
-            random.randint(0, 255),
-            random.randint(0, 255),
-            153,
-        )
-    else:
-        color = (30, 144, 255, 153)
-
-    nonzero_coords = np.transpose(np.nonzero(mask))
-
-    for coord in nonzero_coords:
-        draw.point(coord[::-1], fill=color)
+    return batch_final_boxes, batch_final_scores, batch_final_phrases
 
 
-def draw_box(box, draw, label):
-    # random color
-    color = tuple(np.random.randint(0, 255, size=3).tolist())
+def transform_image_sam(image, device="cpu"):
+    if isinstance(image, Image.Image):
+        image = np.array(image)
 
-    draw.rectangle(((box[0], box[1]), (box[2], box[3])), outline=color, width=2)
-
-    if label:
-        font = ImageFont.load_default()
-        if hasattr(font, "getbbox"):
-            bbox = draw.textbbox((box[0], box[1]), str(label), font)
-        else:
-            w, h = draw.textsize(str(label), font)
-            bbox = (box[0], box[1], w + box[0], box[1] + h)
-        draw.rectangle(bbox, fill=color)
-        draw.text((box[0], box[1]), str(label), fill="white")
-
-        draw.text((box[0], box[1]), label)
+    transform = ResizeLongestSide(sam.image_encoder.img_size)
+    image = transform.apply_image(image)
+    image = torch.as_tensor(image, device=device)
+    return image.permute(2, 0, 1).contiguous()
 
 
-def run_grounded_sam(
-    input_image,
+def sam_prepare_boxes(boxes, image_size):
+    resize_transform = ResizeLongestSide(sam.image_encoder.img_size)
+
+    return resize_transform.apply_boxes_torch(boxes, image_size).to(device)
+
+
+def sam_prepare_row(image, boxes, image_size):
+    return dict(image=image, boxes=boxes, original_size=image_size)
+
+
+def run_sam(images, boxes, image_size=(1024, 1024)):
+
+    sam_boxes = [sam_prepare_boxes(box, image_size) for box in boxes]
+    batched_input = [
+        sam_prepare_row(image, box, image_size) for image, box in zip(images, sam_boxes)
+    ]
+    batched_output = sam(batched_input, multimask_output=False)
+    return batched_output
+
+
+# determine if tensor is empty
+def is_empty(tensor):
+    return tensor.size(0) == 0
+
+
+def run_grounded_sam_batch(
+    dino_images,
+    sam_images,
     text_prompt,
-    box_threshold,
-    text_threshold,
-    iou_threshold,
+    box_thresh=0.3,
+    text_thresh=0.25,
+    iou_thresh=0.8,
 ):
-    global groundingdino_model, sam_predictor
+    global box_threshold, text_threshold, iou_threshold
+    box_threshold = box_thresh
+    text_threshold = text_thresh
+    iou_threshold = iou_thresh
 
-    # load image
-    image_pil = input_image.convert("RGB")
-    transformed_image = transform_image(image_pil)
+    # Process with DINO model
+    boxes, scores, phrases = run_dino(dino_images, text_prompt)
+    boxes, scores, phrases = format_dino(boxes, scores, phrases)
 
-    if groundingdino_model is None:
-        groundingdino_model = load_model(config_file, ckpt_filename, device=device)
+    # Prepare to keep track of outputs, respecting original order
+    batch_size = len(dino_images)
+    rows = [None] * batch_size  # Initialize with None for all entries
 
-    # run grounding dino model
-    boxes_filt, scores, pred_phrases = get_grounding_output(
-        groundingdino_model,
-        transformed_image,
-        text_prompt,
-        box_threshold,
-        text_threshold,
-    )
+    # Determine if any images do not have detections
+    # We do this by looking for any empty bounding boxes
+    valid_indices = [i for i, box in enumerate(boxes) if not is_empty(box)]
 
-    size = image_pil.size
+    # Run any images with detections through SAM
+    if valid_indices:
+        valid_sam_images = sam_images[valid_indices]
+        valid_boxes = [boxes[i] for i in valid_indices]
 
-    # process boxes
-    H, W = size[1], size[0]
-    for i in range(boxes_filt.size(0)):
-        boxes_filt[i] = boxes_filt[i] * torch.Tensor([W, H, W, H])
-        boxes_filt[i][:2] -= boxes_filt[i][2:] / 2
-        boxes_filt[i][2:] += boxes_filt[i][:2]
+        # Process non-empty entries with SAM
+        sam_outputs = run_sam(valid_sam_images, valid_boxes)
+        valid_masks = [output.get("masks") for output in sam_outputs]
 
-    boxes_filt = boxes_filt.cpu()
+        # Filter for scores and phrases that have detections
+        valid_scores = [scores[i] for i in valid_indices]
+        valid_phrases = [phrases[i] for i in valid_indices]
 
-    # nms
-    nms_idx = torchvision.ops.nms(boxes_filt, scores, iou_threshold).numpy().tolist()
-    boxes_filt = boxes_filt[nms_idx]
-    pred_phrases = [pred_phrases[idx] for idx in nms_idx]
+        # Place processed results back in the correct order
+        for idx, mask, box, score, phrase in zip(
+            valid_indices, valid_masks, valid_boxes, valid_scores, valid_phrases
+        ):
+            rows[idx] = {
+                "masks": mask,
+                "boxes": box,
+                "scores": score,
+                "phrases": phrase,
+            }
 
-    if sam_predictor is None:
-        # initialize SAM
-        assert sam_checkpoint, "sam_checkpoint is not found!"
-        sam = build_sam(checkpoint=sam_checkpoint)
-        sam.to(device=device)
-        sam_predictor = SamPredictor(sam)
+    # Fill in rows with None for images without detections
+    for i in range(batch_size):
+        if rows[i] is None:
+            rows[i] = {"masks": None, "boxes": None, "scores": None, "phrases": None}
 
-    image = np.array(image_pil)
-    sam_predictor.set_image(image)
-
-    transformed_boxes = sam_predictor.transform.apply_boxes_torch(
-        boxes_filt, image.shape[:2]
-    ).to(device)
-
-    masks, _, _ = sam_predictor.predict_torch(
-        point_coords=None,
-        point_labels=None,
-        boxes=transformed_boxes,
-        multimask_output=False,
-    )
-
-    # masks: [1, 1, 512, 512]
-
-    mask_image = Image.new("RGBA", size, color=(0, 0, 0, 0))
-
-    mask_draw = ImageDraw.Draw(mask_image)
-    for mask in masks:
-        draw_mask(mask[0].cpu().numpy(), mask_draw, random_color=True)
-
-    image_draw = ImageDraw.Draw(image_pil)
-
-    for box, label in zip(boxes_filt, pred_phrases):
-        draw_box(box, image_draw, label)
-
-    image_pil = image_pil.convert("RGBA")
-    image_pil.alpha_composite(mask_image)
-    return dict(
-        box_image=image_pil,
-        mask_image=mask_image,
-        masks=masks,
-        boxes=boxes_filt,
-        label_scores=pred_phrases,
-    )
-
-
-def get_results(
-    input_image,
-    labels,
-    box_threshold=0.3,
-    text_threshold=0.25,
-    iou_threshold=0.8,
-):
-    text_prompt = " . ".join(labels)
-    input_image = input_image.convert("RGB")
-    return run_grounded_sam(
-        input_image,
-        text_prompt,
-        box_threshold,
-        text_threshold,
-        iou_threshold,
-    )
+    return rows
