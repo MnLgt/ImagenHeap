@@ -22,7 +22,6 @@ def main():
 
     # Load a model
     pretrained = "weights/yolov8n-seg.pt"
-    pretrained = "/home/jordan/SEGMENT/human_parsing/train17/weights/last.pt"
     model = YOLO(
         pretrained, task="segment"
     )  # Load a pretrained model (recommended for training)
@@ -37,7 +36,7 @@ def main():
     add_wandb_callback(model)
 
     # Set the batch size and number of workers
-    bs = 72
+    bs = 168
     workers = os.cpu_count()
 
     # Train the model
@@ -47,13 +46,12 @@ def main():
         epochs=1,
         imgsz=1024,
         batch=bs,
-        workers=workers,
+        workers=8,
         augment=True,
         device=[0],
         patience=20,
-        save_period=5,
+        save_period=1,
         cache=True,
-        workers=workers,
     )
 
     # Finish the W&B run
