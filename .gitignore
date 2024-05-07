@@ -4,7 +4,7 @@ __pycache__
 *.zip
 events.*
 *.deb
-!requirements.txt
+!*requirements.txt
 *.txt
 
 *.json

@@ -36,7 +36,7 @@ def main():
     add_wandb_callback(model)
 
     # Set the batch size and number of workers
-    bs = 168
+    bs = 80
     workers = os.cpu_count()
 
     # Train the model
