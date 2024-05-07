@@ -1,4 +1,4 @@
-from PIL import Image
+from PIL import Image, ImageOps
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
@@ -131,29 +131,6 @@ def get_coco_style_polygons(mask):
     return coco_polygons
 
 
-def convert_coco_to_yolo_polygons(coco_polygons, image_width, image_height):
-    """
-    Converts COCO style polygons to a normalized YOLO style format, outputting a single list
-    of coordinates.
-
-    Parameters:
-    - coco_polygons: List of polygons, each represented as a flat list of points.
-    - image_width: The width of the original image.
-    - image_height: The height of the original image.
-
-    Returns:
-    - List of coordinates in YOLO format, normalized by the image dimensions and flattened into a single list.
-    """
-    yolo_coordinates = []
-    for polygon in coco_polygons:
-        for i in range(0, len(polygon), 2):
-            x_normalized = polygon[i] / image_width
-            y_normalized = polygon[i + 1] / image_height
-            yolo_coordinates.extend([x_normalized, y_normalized])
-
-    return yolo_coordinates
-
-
 def convert_coco_polygons_to_mask(polygons, height, width):
     """
     Converts COCO polygons back into a boolean mask.
@@ -226,3 +203,34 @@ def pad_to_fixed_size(img, size=(640, 640)):
     # Apply padding
     img_padded = F.pad(img, padding=(left, top, right, bottom))
     return img_padded
+
+
+def resize_image_pil(image_pil, max_size=1024):
+    # Ensure image is in RGB
+    if image_pil.mode != "RGB":
+        image_pil = image_pil.convert("RGB")
+
+    # Calculate new dimensions preserving aspect ratio
+    width, height = image_pil.size
+    scale = min(max_size / width, max_size / height)
+    new_width = int(width * scale)
+    new_height = int(height * scale)
+    image_pil = image_pil.resize((new_width, new_height), Image.LANCZOS)
+
+    # Calculate padding needed to reach 1024x1024
+    pad_width = (max_size - new_width) // 2
+    pad_height = (max_size - new_height) // 2
+
+    # Apply padding symmetrically
+    image_pil = ImageOps.expand(
+        image_pil,
+        border=(
+            pad_width,
+            pad_height,
+            max_size - new_width - pad_width,
+            max_size - new_height - pad_height,
+        ),
+        fill=(0, 0, 0),
+    )
+
+    return image_pil

@@ -85,4 +85,4 @@ class SAMResults:
 
     def get_mask(self, mask_label):
         assert mask_label in self.labels, "Mask label not found in results"
-        return [f for f in r.formatted_results if f.get("label") == mask_label]
+        return [f for f in self.formatted_results if f.get("label") == mask_label]

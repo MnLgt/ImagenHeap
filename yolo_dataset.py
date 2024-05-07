@@ -1,36 +1,77 @@
-
 import os
-from PIL import Image
+from PIL import Image, ImageOps
 from tqdm import tqdm
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from datasets import load_dataset
-from utils import convert_coco_to_yolo_polygons
-import io 
+from utils import resize_image_pil
+import io
+import numpy as np
 
 
-def convert_coco_to_yolo_polygons(coco_polygons, image_width, image_height):
+def min_index(arr1, arr2):
     """
-    Converts COCO style polygons to a normalized YOLO style format, outputting a single list
-    of normalized coordinates representing the perimeter of the segmentation.
+    Find a pair of indexes with the shortest distance.
 
-    Parameters:
-    - coco_polygons: List of polygons, each represented as a flat list of points (x1, y1, x2, y2, ..., xn, yn).
-    - image_width: The width of the original image.
-    - image_height: The height of the original image.
-
-    Returns:
-    - Single list of normalized coordinates in the format [x1, y1, x2, y2, ..., xn, yn] for all polygons concatenated.
+    Args:
+        arr1: (N, 2).
+        arr2: (M, 2).
+    Return:
+        a pair of indexes(tuple).
     """
-    yolo_coordinates = []
-    for polygon in coco_polygons:
-        for i in range(0, len(polygon), 2):
-            x_normalized = polygon[i] / image_width
-            y_normalized = polygon[i + 1] / image_height
-            yolo_coordinates.extend([x_normalized, y_normalized])
+    dis = ((arr1[:, None, :] - arr2[None, :, :]) ** 2).sum(-1)
+    return np.unravel_index(np.argmin(dis, axis=None), dis.shape)
 
-    return yolo_coordinates
 
-# Make the train and val directories for images and labels 
+def merge_multi_segment(segments):
+    """
+    Merge multi segments to one list. Find the coordinates with min distance between each segment, then connect these
+    coordinates with one thin line to merge all segments into one.
+
+    Args:
+        segments(List(List)): original segmentations in coco's json file.
+            like [segmentation1, segmentation2,...],
+            each segmentation is a list of coordinates.
+    """
+    s = []
+    segments = [np.array(i).reshape(-1, 2) for i in segments]
+    idx_list = [[] for _ in range(len(segments))]
+
+    # record the indexes with min distance between each segment
+    for i in range(1, len(segments)):
+        idx1, idx2 = min_index(segments[i - 1], segments[i])
+        idx_list[i - 1].append(idx1)
+        idx_list[i].append(idx2)
+
+    # use two round to connect all the segments
+    for k in range(2):
+        # forward connection
+        if k == 0:
+            for i, idx in enumerate(idx_list):
+                # middle segments have two indexes
+                # reverse the index of middle segments
+                if len(idx) == 2 and idx[0] > idx[1]:
+                    idx = idx[::-1]
+                    segments[i] = segments[i][::-1, :]
+
+                segments[i] = np.roll(segments[i], -idx[0], axis=0)
+                segments[i] = np.concatenate([segments[i], segments[i][:1]])
+                # deal with the first segment and the last one
+                if i in [0, len(idx_list) - 1]:
+                    s.append(segments[i])
+                else:
+                    idx = [0, idx[1] - idx[0]]
+                    s.append(segments[i][idx[0] : idx[1] + 1])
+
+        else:
+            for i in range(len(idx_list) - 1, -1, -1):
+                if i not in [0, len(idx_list) - 1]:
+                    idx = idx_list[i]
+                    nidx = abs(idx[1] - idx[0])
+                    s.append(segments[i][nidx:])
+    return s
+
+
+# Make the train and val directories for images and labels
 def make_yolo_dirs(parent_dir):
     train_dir = os.path.join(parent_dir, "images", "train")
     train_labels = os.path.join(parent_dir, "labels", "train")
@@ -44,44 +85,71 @@ def make_yolo_dirs(parent_dir):
     os.makedirs(val_labels, exist_ok=True)
     return train_dir, val_dir
 
+
 def get_lines(md, image_width, image_height):
     lines = []
     for row in md:
         label = row.get("label")
         label_id = row.get("label_id")
         coco_polygons = row.get("polygons")
-        yolo_polygons = convert_coco_to_yolo_polygons(coco_polygons, image_width, image_height)
+
+        if len(coco_polygons) > 1:
+            yolo_polygons = merge_multi_segment(coco_polygons)
+            yolo_polygons = (
+                (
+                    np.concatenate(yolo_polygons, axis=0)
+                    / np.array([image_width, image_height])
+                )
+                .reshape(-1)
+                .tolist()
+            )
+
+        else:
+            yolo_polygons = [j for i in coco_polygons for j in i]
+            yolo_polygons = (
+                (
+                    np.array(yolo_polygons).reshape(-1, 2)
+                    / np.array([image_width, image_height])
+                )
+                .reshape(-1)
+                .tolist()
+            )
+
         yolo_polygons_str = " ".join([str(coord) for coord in yolo_polygons])
         yolo_line = f"{label_id} {yolo_polygons_str}"
         lines.append(yolo_line)
     return lines
 
+
 def write_image_and_text_file(image, image_name, lines, output_dir):
     # Save images as jpegs
     image_uuid = image_name.split(".")[0]
     image_name = f"{image_uuid}.jpg"
-    image_path = os.path.join(output_dir,image_name)
+    image_path = os.path.join(output_dir, image_name)
 
     text_name = f"{image_uuid}.txt"
     text_output_dir = output_dir.replace("images", "labels")
     text_path = os.path.join(text_output_dir, text_name)
-    
-    if image.mode != "RGB":
-        image = image.convert("RGB")
+
     image.save(image_path)
+
     with open(text_path, "w") as f:
         f.write("\n".join(lines))
 
+
 def format_and_write(row, output_dir):
     try:
-        image = row.get('image')
-        md = row.get('mask_metadata')
+        image = row.get("image")
+        image = resize_image_pil(image)
+
+        md = row.get("mask_metadata")
         if md:
-            image_name = row['image_id']
+            image_name = row["image_id"]
             lines = get_lines(md, image.width, image.height)
             write_image_and_text_file(image, image_name, lines, output_dir)
     except Exception as e:
         print(f"Error processing {row.get('image_id', 'Unknown ID')}: {str(e)}")
+
 
 def main():
     repo_id = "jordandavis/fashion_people_detections"
@@ -89,7 +157,7 @@ def main():
     workers = os.cpu_count()
 
     # Load Dataset
-    ds = load_dataset(repo_id, split='train', trust_remote_code=True, num_proc=workers)
+    ds = load_dataset(repo_id, split="train", trust_remote_code=True, num_proc=workers)
 
     # Split
     ds = ds.train_test_split(train_size=0.9)
@@ -106,10 +174,11 @@ def main():
             futures.append(executor.submit(format_and_write, row, train_dir))
         for row in tqdm(val):
             futures.append(executor.submit(format_and_write, row, val_dir))
-        
+
         # Wait for all futures to complete
         for future in as_completed(futures):
             pass
+
 
 if __name__ == "__main__":
     main()
