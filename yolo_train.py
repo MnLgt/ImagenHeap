@@ -1,4 +1,7 @@
 # %%
+import os
+
+os.environ["CUDA_HOME"] = "/usr/local/cuda-12.0"
 from ultralytics import YOLO
 from wandb.integration.ultralytics import add_wandb_callback
 import os
@@ -16,18 +19,26 @@ warnings.filterwarnings(action="ignore", category=UserWarning)
 
 def main():
     # Initialize WandB
-    project = "human_parsing"
+    project = "human_parsing_test"
+    yaml_file = "configs/fashion_people_detection.yml"
+    pretrained = "weights/yolov8x-seg.pt"
+
+    # Training Settings
+    epochs = 20
+    imgsz = 640
+    bs = 16
+    workers = os.cpu_count()
+    half = False
 
     wandb.init(project=project)
 
     # Load a model
-    pretrained = "weights/yolov8n-seg.pt"
     model = YOLO(
         pretrained, task="segment"
     )  # Load a pretrained model (recommended for training)
+    # model = YOLO(model_file).load(pretrained)  # build from YAML and transfer weights
 
     # Load labels from YAML configuration file
-    yaml_file = "configs/fashion_people_detection.yml"
     with open(yaml_file, "r") as f:
         config = yaml.safe_load(f)
         class_labels = config["names"]  # Adjust the key based on your YAML structure
@@ -35,23 +46,16 @@ def main():
     # Add WandB callback
     add_wandb_callback(model)
 
-    # Set the batch size and number of workers
-    bs = 80
-    workers = os.cpu_count()
-
     # Train the model
     results = model.train(
         project=project,
         data=yaml_file,
-        epochs=1,
-        imgsz=1024,
+        epochs=epochs,
+        imgsz=imgsz,
         batch=bs,
-        workers=8,
-        augment=True,
-        device=[0],
-        patience=20,
-        save_period=1,
+        workers=workers,
         cache=True,
+        half=half,
     )
 
     # Finish the W&B run

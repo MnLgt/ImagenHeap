@@ -4,17 +4,29 @@ import GPUtil
 from blessed import Terminal
 
 
+import math  # Import math to check for NaN
+
+
 def get_gpu_info():
     gpus = GPUtil.getGPUs()
     gpu_info = []
     for gpu in gpus:
+        load = gpu.load if gpu.load is not None else 0
+        memory_used = gpu.memoryUsed if gpu.memoryUsed is not None else 0
+        memory_total = gpu.memoryTotal if gpu.memoryTotal is not None else 0
+        memory_util = gpu.memoryUtil if gpu.memoryUtil is not None else 0
+
+        # Replace NaN values with 0
+        load = 0 if math.isnan(load) else int(load * 100)
+        memory_util = 0 if math.isnan(memory_util) else int(memory_util * 100)
+
         gpu_info.append(
             {
                 "name": gpu.name,
-                "load": int(gpu.load * 100),
-                "memory_used": int(gpu.memoryUsed),
-                "memory_total": int(gpu.memoryTotal),
-                "memory_util": int(gpu.memoryUtil * 100),
+                "load": load,
+                "memory_used": int(memory_used),
+                "memory_total": int(memory_total),
+                "memory_util": memory_util,
             }
         )
     return gpu_info

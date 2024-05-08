@@ -88,11 +88,16 @@ def make_yolo_dirs(parent_dir):
 
 def get_lines(md, image_width, image_height):
     lines = []
+    label_scores = {}  # Dictionary to keep track of the best scores per label
+
     for row in md:
         label = row.get("label")
         label_id = row.get("label_id")
-        coco_polygons = row.get("polygons")
 
+        coco_polygons = row.get("polygons")
+        score = row.get("score", 0)  # Default score
+
+        # Normalize and reshape polygon coordinates
         if len(coco_polygons) > 1:
             yolo_polygons = merge_multi_segment(coco_polygons)
             yolo_polygons = (
@@ -103,7 +108,6 @@ def get_lines(md, image_width, image_height):
                 .reshape(-1)
                 .tolist()
             )
-
         else:
             yolo_polygons = [j for i in coco_polygons for j in i]
             yolo_polygons = (
@@ -117,7 +121,13 @@ def get_lines(md, image_width, image_height):
 
         yolo_polygons_str = " ".join([str(coord) for coord in yolo_polygons])
         yolo_line = f"{label_id} {yolo_polygons_str}"
-        lines.append(yolo_line)
+
+        # Determine if this is the best scoring instance of the label
+        if label not in label_scores or label_scores[label]["score"] < score:
+            label_scores[label] = {"score": score, "line": yolo_line}
+
+    # Get only the best scoring instances
+    lines = [info["line"] for info in label_scores.values()]
     return lines
 
 
@@ -151,13 +161,52 @@ def format_and_write(row, output_dir):
         print(f"Error processing {row.get('image_id', 'Unknown ID')}: {str(e)}")
 
 
+def check_directory_contents(image_dir, label_dir):
+    # Create sets of all image and label filenames
+    image_files = {f for f in os.listdir(image_dir) if f.endswith(".jpg")}
+    label_files = {f for f in os.listdir(label_dir) if f.endswith(".txt")}
+
+    # Convert image filenames to the expected label filenames
+    expected_label_files = {image.replace(".jpg", ".txt") for image in image_files}
+
+    # Find mismatches between expected and actual label files
+    missing_labels = expected_label_files - label_files
+    extra_labels = label_files - expected_label_files
+
+    # Report findings
+    if not missing_labels and not extra_labels:
+        print(
+            f"All checks passed for {image_dir} and {label_dir}: Every image has a corresponding label."
+        )
+    else:
+        if missing_labels:
+            print(f"Missing label files in {label_dir}: {missing_labels}")
+        if extra_labels:
+            print(
+                f"Extra label files in {label_dir} not corresponding to images: {extra_labels}"
+            )
+
+
+def check_all_directories(train_image_dir, val_image_dir):
+    train_label_dir = train_image_dir.replace("images", "labels")
+    val_label_dir = val_image_dir.replace("images", "labels")
+
+    print("Checking training data...")
+    check_directory_contents(train_image_dir, train_label_dir)
+
+    print("Checking validation data...")
+    check_directory_contents(val_image_dir, val_label_dir)
+
+
 def main():
     repo_id = "jordandavis/fashion_people_detections"
     parent_dir = "datasets/fashion_people_detection"
     workers = os.cpu_count()
 
     # Load Dataset
-    ds = load_dataset(repo_id, split="train", trust_remote_code=True, num_proc=workers)
+    ds = load_dataset(
+        repo_id, split="train", trust_remote_code=True, num_proc=workers
+    ).take(100)
 
     # Split
     ds = ds.train_test_split(train_size=0.9)
@@ -170,14 +219,32 @@ def main():
     # Parallel processing
     with ProcessPoolExecutor(max_workers=os.cpu_count()) as executor:
         futures = []
-        for row in tqdm(train):
+
+        # Process training data
+        for row in tqdm(train, desc="Processing Training Data"):
             futures.append(executor.submit(format_and_write, row, train_dir))
-        for row in tqdm(val):
+
+        # Wait for all training futures to complete
+        for future in as_completed(futures):
+            # Optionally handle or log errors from futures here
+            if future.exception():
+                print("Error in processing a training item:", future.exception())
+
+        # Clear the list of futures for validation processing
+        futures = []
+
+        # Process validation data
+        for row in tqdm(val, desc="Processing Validation Data"):
             futures.append(executor.submit(format_and_write, row, val_dir))
 
-        # Wait for all futures to complete
+        # Wait for all validation futures to complete
         for future in as_completed(futures):
-            pass
+            # Optionally handle or log errors from futures here
+            if future.exception():
+                print("Error in processing a validation item:", future.exception())
+
+    # Check directories
+    check_all_directories(train_dir, val_dir)
 
 
 if __name__ == "__main__":
