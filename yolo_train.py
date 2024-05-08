@@ -1,7 +1,7 @@
 # %%
 import os
 
-os.environ["CUDA_HOME"] = "/usr/local/cuda-12.0"
+# os.environ["CUDA_HOME"] = "/usr/local/cuda-12.0"
 from ultralytics import YOLO
 from wandb.integration.ultralytics import add_wandb_callback
 import os
@@ -19,16 +19,19 @@ warnings.filterwarnings(action="ignore", category=UserWarning)
 
 def main():
     # Initialize WandB
-    project = "human_parsing_test"
+    project = "human_parsing"
     yaml_file = "configs/fashion_people_detection.yml"
-    pretrained = "weights/yolov8x-seg.pt"
+    # pretrained = "weights/yolov8x-seg.pt"
+    pretrained = "/workspace/SEGMENT/human_parsing/train2/weights/last.pt"
 
     # Training Settings
-    epochs = 20
+    epochs = 100
     imgsz = 640
-    bs = 16
-    workers = os.cpu_count()
+    bs = 96
+    workers = 8
     half = False
+    device = [0,1]
+    augment=True
 
     wandb.init(project=project)
 
@@ -53,9 +56,11 @@ def main():
         epochs=epochs,
         imgsz=imgsz,
         batch=bs,
+        device=device,
         workers=workers,
         cache=True,
         half=half,
+        augment=augment
     )
 
     # Finish the W&B run

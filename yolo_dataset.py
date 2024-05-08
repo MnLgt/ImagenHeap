@@ -205,8 +205,8 @@ def main():
 
     # Load Dataset
     ds = load_dataset(
-        repo_id, split="train", trust_remote_code=True, num_proc=workers
-    ).take(100)
+        repo_id, split="train", trust_remote_code=True, num_proc=workers, cache_dir='hf_cache'
+    )
 
     # Split
     ds = ds.train_test_split(train_size=0.9)
