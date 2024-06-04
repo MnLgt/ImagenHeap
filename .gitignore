@@ -41,6 +41,7 @@ space_designer/all_cb2_images_captions.csv
 datasets/*
 human_parsing/
 human_parsing_new/
+human_parsing_from_scratch/
 wandb/
 weights/
 logs/*

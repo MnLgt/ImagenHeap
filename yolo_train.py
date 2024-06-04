@@ -18,9 +18,10 @@ warnings.filterwarnings(action="ignore", category=UserWarning)
 
 def main():
     # Initialize WandB
-    project = "human_parsing_new"
+    project = "human_parsing_from_scratch"
     yaml_file = "configs/fashion_people_detection.yml"
     pretrained = "/workspace/SEGMENT/human_parsing_new/train/weights/best.pt"
+    pretrained = "/workspace/SEGMENT/weights/yolov8x-seg.pt"
 
     # Training Settings
     epochs = 20
@@ -29,7 +30,7 @@ def main():
     workers = 8
     half = False
     device = [0,1]
-    augment=False
+    augment=True
 
     wandb.init(project=project)
 
@@ -57,7 +58,8 @@ def main():
         workers=workers,
         cache=True,
         half=half,
-        augment=augment
+        augment=augment,
+        patience=2
     )
 
     # Finish the W&B run
