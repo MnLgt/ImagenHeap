@@ -12,26 +12,24 @@ from dotenv import load_dotenv, find_dotenv
 
 load_dotenv(find_dotenv())
 wandb_key = os.getenv("WANDB_API_KEY")
-os.environ["WANDB_API_KEY"] = wandb_key
 
 warnings.filterwarnings(action="ignore", category=UserWarning)
 
 
 def main():
     # Initialize WandB
-    project = "human_parsing"
+    project = "human_parsing_new"
     yaml_file = "configs/fashion_people_detection.yml"
-    # pretrained = "weights/yolov8x-seg.pt"
-    pretrained = "/workspace/SEGMENT/human_parsing/train2/weights/last.pt"
+    pretrained = "/workspace/SEGMENT/human_parsing_new/train/weights/best.pt"
 
     # Training Settings
-    epochs = 100
+    epochs = 20
     imgsz = 640
     bs = 96
     workers = 8
     half = False
     device = [0,1]
-    augment=True
+    augment=False
 
     wandb.init(project=project)
 
@@ -39,7 +37,6 @@ def main():
     model = YOLO(
         pretrained, task="segment"
     )  # Load a pretrained model (recommended for training)
-    # model = YOLO(model_file).load(pretrained)  # build from YAML and transfer weights
 
     # Load labels from YAML configuration file
     with open(yaml_file, "r") as f:

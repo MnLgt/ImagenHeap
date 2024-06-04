@@ -92,42 +92,41 @@ def get_lines(md, image_width, image_height):
 
     for row in md:
         label = row.get("label")
-        label_id = row.get("label_id")
-
-        coco_polygons = row.get("polygons")
-        score = row.get("score", 0)  # Default score
-
-        # Normalize and reshape polygon coordinates
-        if len(coco_polygons) > 1:
-            yolo_polygons = merge_multi_segment(coco_polygons)
-            yolo_polygons = (
-                (
-                    np.concatenate(yolo_polygons, axis=0)
-                    / np.array([image_width, image_height])
+        
+        # don't include person since it overlaps with other masks
+        if label != 'person':
+            label_id = row.get("label_id")
+    
+            coco_polygons = row.get("polygons")
+            score = row.get("score", 0)  # Default score
+    
+            # Normalize and reshape polygon coordinates
+            if len(coco_polygons) > 1:
+                yolo_polygons = merge_multi_segment(coco_polygons)
+                yolo_polygons = (
+                    (
+                        np.concatenate(yolo_polygons, axis=0)
+                        / np.array([image_width, image_height])
+                    )
+                    .reshape(-1)
+                    .tolist()
                 )
-                .reshape(-1)
-                .tolist()
-            )
-        else:
-            yolo_polygons = [j for i in coco_polygons for j in i]
-            yolo_polygons = (
-                (
-                    np.array(yolo_polygons).reshape(-1, 2)
-                    / np.array([image_width, image_height])
+            else:
+                yolo_polygons = [j for i in coco_polygons for j in i]
+                yolo_polygons = (
+                    (
+                        np.array(yolo_polygons).reshape(-1, 2)
+                        / np.array([image_width, image_height])
+                    )
+                    .reshape(-1)
+                    .tolist()
                 )
-                .reshape(-1)
-                .tolist()
-            )
+    
+            yolo_polygons_str = " ".join([str(coord) for coord in yolo_polygons])
+            yolo_line = f"{label_id} {yolo_polygons_str}"
+            
+            lines.append(yolo_line)
 
-        yolo_polygons_str = " ".join([str(coord) for coord in yolo_polygons])
-        yolo_line = f"{label_id} {yolo_polygons_str}"
-
-        # Determine if this is the best scoring instance of the label
-        if label not in label_scores or label_scores[label]["score"] < score:
-            label_scores[label] = {"score": score, "line": yolo_line}
-
-    # Get only the best scoring instances
-    lines = [info["line"] for info in label_scores.values()]
     return lines
 
 
