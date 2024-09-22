@@ -1,4 +1,4 @@
-from utils import display_image_with_masks, unload_mask, unload_box
+from SEGMENT.segment.utils import display_image_with_masks, unload_mask, unload_box
 import numpy as np
 
 

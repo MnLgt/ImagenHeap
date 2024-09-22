@@ -1,8 +1,8 @@
 # Train/val/test sets as 1) dir: path/to/imgs, 2) file: path/to/imgs.txt, or 3) list: [path/to/imgs1, path/to/imgs2, ..]
-path: /workspace/SEGMENT/datasets/fashion_people_detection # dataset root dir
+path: fashion_people_detection # dataset root dir
 train: images/train  # train images (relative to path) 4 images
 val: images/val  # val images (relative to path) 4 images
-test:  # test images (optional)
+# test:  # test images (optional)
 
 # Classes (80 COCO classes)
 names:
@@ -17,3 +17,17 @@ names:
   8: outfit
   9: person
   10: phone
+
+colors:
+  - [0, 0, 0]        # background: Black
+  - [255, 0, 0]      # hair: Red
+  - [0, 255, 0]      # face: Green
+  - [0, 0, 255]      # neck: Blue
+  - [255, 255, 0]    # arm: Yellow
+  - [255, 0, 255]    # hand: Magenta
+  - [0, 255, 255]    # back: Cyan
+  - [255, 128, 0]    # leg: Orange
+  - [128, 0, 128]    # foot: Purple
+  - [75, 0, 130]     # outfit: Dark Purple
+  - [128, 128, 128]  # person: Gray
+  - [255, 192, 203]  # phone: Pink

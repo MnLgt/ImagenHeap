@@ -199,7 +199,7 @@ def check_all_directories(train_image_dir, val_image_dir):
 
 def main():
     repo_id = "jordandavis/fashion_people_detections"
-    parent_dir = "datasets/fashion_people_detection"
+    parent_dir = os.path.join(os.path.dirname(__file__),"..","datasets/fashion_people_detection")
     workers = os.cpu_count()
 
     # Load Dataset
@@ -248,3 +248,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+    
