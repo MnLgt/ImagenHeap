@@ -1,5 +1,7 @@
-from SEGMENT.segment.utils import display_image_with_masks, unload_mask, unload_box
 import numpy as np
+
+from SEGMENT.segment.utils import (display_image_with_masks, unload_box,
+                                   unload_mask)
 
 
 def format_labels(label_scores):

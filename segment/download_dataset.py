@@ -1,11 +1,11 @@
 import os
-from PIL import Image, ImageOps
-from tqdm import tqdm
 from concurrent.futures import ProcessPoolExecutor, as_completed
-from datasets import load_dataset
-from utils import resize_image_pil
-import io
+
 import numpy as np
+from datasets import load_dataset
+from tqdm import tqdm
+
+from utils import resize_image_pil
 
 
 def min_index(arr1, arr2):
@@ -92,14 +92,14 @@ def get_lines(md, image_width, image_height):
 
     for row in md:
         label = row.get("label")
-        
+
         # don't include person since it overlaps with other masks
-        if label != 'person':
+        if label != "person":
             label_id = row.get("label_id")
-    
+
             coco_polygons = row.get("polygons")
             score = row.get("score", 0)  # Default score
-    
+
             # Normalize and reshape polygon coordinates
             if len(coco_polygons) > 1:
                 yolo_polygons = merge_multi_segment(coco_polygons)
@@ -121,10 +121,10 @@ def get_lines(md, image_width, image_height):
                     .reshape(-1)
                     .tolist()
                 )
-    
+
             yolo_polygons_str = " ".join([str(coord) for coord in yolo_polygons])
             yolo_line = f"{label_id} {yolo_polygons_str}"
-            
+
             lines.append(yolo_line)
 
     return lines
@@ -199,12 +199,18 @@ def check_all_directories(train_image_dir, val_image_dir):
 
 def main():
     repo_id = "jordandavis/fashion_people_detections"
-    parent_dir = os.path.join(os.path.dirname(__file__),"..","datasets/fashion_people_detection")
+    parent_dir = os.path.join(
+        os.path.dirname(__file__), "..", "datasets/fashion_people_detection"
+    )
     workers = os.cpu_count()
 
     # Load Dataset
     ds = load_dataset(
-        repo_id, split="train", trust_remote_code=True, num_proc=workers, cache_dir='hf_cache'
+        repo_id,
+        split="train",
+        trust_remote_code=True,
+        num_proc=workers,
+        cache_dir="hf_cache",
     )
 
     # Split
@@ -248,4 +254,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-    

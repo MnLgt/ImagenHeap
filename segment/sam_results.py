@@ -1,5 +1,6 @@
-from SEGMENT.segment.utils import display_image_with_masks, unload_mask, unload_box
 import numpy as np
+
+from segment.utils import display_image_with_masks, unload_box, unload_mask
 
 
 def format_scores(scores):

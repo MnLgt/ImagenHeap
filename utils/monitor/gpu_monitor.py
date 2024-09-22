@@ -1,6 +1,6 @@
+import re
 import subprocess
 import time
-import re
 
 
 def get_gpu_memory():

@@ -1,35 +1,39 @@
+import warnings
+
+warnings.filterwarnings(action="ignore", category=UserWarning)
+warnings.filterwarnings(action="ignore", category=FutureWarning)
+
 import os
 
 os.environ["CUDA_HOME"] = "/usr/local/cuda-12.0"
 
-import warnings
 from functools import lru_cache
+
 import numpy as np
 import torchvision
 from segment_anything.utils.transforms import ResizeLongestSide
 
-warnings.filterwarnings(action="ignore", category=UserWarning)
-warnings.filterwarnings(action="ignore", category=FutureWarning)
 
 import numpy as np
 
 # diffusers
 import torch
 import torchvision
-from PIL import Image
-
-# segment anything
-from segment_anything import SamPredictor, build_sam
-from segment_anything.utils.transforms import ResizeLongestSide
 
 # Grounding DINO
-from GroundingDINO.groundingdino.models import build_model
 import GroundingDINO.groundingdino.datasets.transforms as T
+from GroundingDINO.groundingdino.models import build_model
 from GroundingDINO.groundingdino.util.slconfig import SLConfig
 from GroundingDINO.groundingdino.util.utils import (
     clean_state_dict,
     get_phrases_from_posmap,
 )
+from PIL import Image
+
+# segment anything
+from segment_anything import build_sam
+from segment_anything.utils.transforms import ResizeLongestSide
+from segment.utils import get_device
 
 
 def load_model(model_config_path, model_checkpoint_path, device):
@@ -45,7 +49,7 @@ def load_model(model_config_path, model_checkpoint_path, device):
     return model
 
 
-device = "cuda" if torch.cuda.is_available() else "cpu"
+device = get_device()
 
 
 ckpt_repo_id = "ShilongLiu/GroundingDINO"

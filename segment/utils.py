@@ -1,15 +1,20 @@
-from PIL import Image, ImageOps
-import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.patches as patches
-import numpy as np
 import cv2
+import matplotlib.patches as patches
+import matplotlib.pyplot as plt
+import numpy as np
+import torch
+from PIL import Image, ImageOps
 from torchvision.transforms import functional as F
 
 
-import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.patches as patches
+def get_device():
+    if torch.cuda.is_available():
+        device = "cuda"
+    elif torch.backends.mps.is_built():
+        device = "mps"
+    else:
+        device = "cpu"
+    return device
 
 
 def display_image_with_masks(image, results, cols=4):

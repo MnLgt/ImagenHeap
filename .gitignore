@@ -6,6 +6,7 @@ events.*
 *.deb
 !*requirements.txt
 *.txt
+*/**.lock
 
 *.json
 *.jsonl

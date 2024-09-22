@@ -1,10 +1,9 @@
-import time
-import psutil
-import GPUtil
-from blessed import Terminal
-
-
 import math  # Import math to check for NaN
+import time
+
+import GPUtil
+import psutil
+from blessed import Terminal
 
 
 def get_gpu_info():

@@ -1,5 +1,6 @@
-import psutil
 import time
+
+import psutil
 
 
 def get_cpu_memory():

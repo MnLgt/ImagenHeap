@@ -8,23 +8,22 @@ warnings.filterwarnings(action="ignore", category=UserWarning)
 warnings.filterwarnings(action="ignore", category=FutureWarning)
 import argparse
 
+# Grounding DINO
+import GroundingDINO.groundingdino.datasets.transforms as T
 import numpy as np
 # diffusers
 import torch
 import torchvision
 from diffusers.utils import make_image_grid
+from GroundingDINO.groundingdino.models import build_model
+from GroundingDINO.groundingdino.util.slconfig import SLConfig
+from GroundingDINO.groundingdino.util.utils import (clean_state_dict,
+                                                    get_phrases_from_posmap)
 from PIL import Image, ImageDraw, ImageFont
 # segment anything
 from segment_anything import SamPredictor, build_sam
 # BLIP
 from transformers import BlipForConditionalGeneration, BlipProcessor
-
-# Grounding DINO
-import GroundingDINO.groundingdino.datasets.transforms as T
-from GroundingDINO.groundingdino.models import build_model
-from GroundingDINO.groundingdino.util.slconfig import SLConfig
-from GroundingDINO.groundingdino.util.utils import (clean_state_dict,
-                                                    get_phrases_from_posmap)
 
 config_file = "GroundingDINO/groundingdino/config/GroundingDINO_SwinT_OGC.py"
 ckpt_repo_id = "ShilongLiu/GroundingDINO"
