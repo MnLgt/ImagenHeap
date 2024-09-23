@@ -1,45 +1,30 @@
-# Install
+### Install
 ```
 chmod +x ./install.sh
 ./install.sh
 ```
 
-# Download the dataset 
+### Download the dataset 
 - Make sure to have your hf key in the env
 
 ```
 python segment/download_dataset.py
 ```
 
-### Segment With Text Prompt 
+### <h1>Segment With Text Prompt</h1>
 
 - See example notebook for more details
 
 
 ### Project Structure ###
 
-THe purpose of this module:
-    - Get the segmentation masks from images using text prompts 
-    - Create a dataset of the masks and the corresponding bounding boxes
-    - Train a yolo model on the masks
-    - Push the model and dataset to the hub
+The purpose of this module: 
+- Get all of the segmentation masks for the images in the dataset based on text prompts 
+- Train a yolo model on the segmentation masks 
+- Push the dataset and the model to the hub 
 
-CONFIG
-The config directory includes the config files in yolo format.  
 
-They should include paths to the train and val images dir 
-A dictionary of label_ids and labels
-Colors - Optional - A list of the colors to use for each corresponding label
-
-PARSE - Get the masks and boxes for those labels 
-
-CONVERT - Make a dataset 
-
-PUSH_TO_HUB - push dataset to hub PUSH_TO_HUB
-
-CONVERT - Convert the dataset to yolo format 
-
-TRAIN - Train yolo model 
-
-PUSH_TO_HUB - Push yolo model to hub
-
+### Yolo To Do ###
+Build tools for dataset quality control: 
+- bar chart of class distribution
+- Add a filter for the dataset to filter out images below a certain score 

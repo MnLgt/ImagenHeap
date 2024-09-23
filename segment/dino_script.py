@@ -27,7 +27,7 @@ from segment.utils import get_device
 
 DEVICE = get_device()
 
-CURDIR = os.getcwd()
+CURDIR = os.path.dirname(__file__)
 
 WEIGHTS_DIR = os.path.join(CURDIR, "..", "weights")
 

@@ -9,7 +9,6 @@ from wandb.integration.ultralytics import add_wandb_callback
 
 # os.environ["CUDA_HOME"] = "/usr/local/cuda-12.0"
 
-
 CONFIG_DIR = os.path.join(os.path.dirname(__file__), "..", "configs")
 
 TRAIN_CONFIG_PATH = os.path.join(CONFIG_DIR, "train_config.yml")
