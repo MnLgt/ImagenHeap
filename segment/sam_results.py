@@ -1,6 +1,6 @@
 import numpy as np
-
 from segment.utils import display_image_with_masks, unload_box, unload_mask
+from segment.utils import get_coco_style_polygons
 
 
 def format_scores(scores):
@@ -28,18 +28,25 @@ def remove_non_person_masks(person_mask, formatted_results):
     ]
 
 
-def format_results(labels, scores, boxes, masks, labels_dict, person_masks_only=True):
+def format_results(
+    labels, scores, boxes, masks, labels_dict, polygons, person_masks_only=True
+):
 
     # check that the person mask is present
     if person_masks_only:
         assert "person" in labels, "Person mask not present in results"
 
     results_dict = []
-    for row in zip(labels, scores, boxes, masks):
-        label, score, box, mask = row
+    for row in zip(labels, scores, boxes, masks, polygons):
+        label, score, box, mask, polygon = row
         label_id = labels_dict[label]
         results_row = dict(
-            label=label, score=score, mask=mask, box=box, label_id=label_id
+            label=label,
+            score=score,
+            mask=mask,
+            box=box,
+            label_id=label_id,
+            polygons=polygon,
         )
         results_dict.append(results_row)
 
@@ -75,6 +82,7 @@ class SAMResults:
         self.masks = format_masks(masks)
         self.boxes = format_boxes(boxes)
         self.scores = format_scores(scores)
+        self.polygons = self.get_polygons()
         self.labels = phrases
         self.labels_dict = labels_dict
         self.person_masks_only = person_masks_only
@@ -84,8 +92,12 @@ class SAMResults:
             self.boxes,
             self.masks,
             self.labels_dict,
+            self.polygons,
             self.person_masks_only,
         )
+
+    def get_polygons(self):
+        return [get_coco_style_polygons(mask) for mask in self.masks]
 
     def display_results(self):
         if len(self.masks) < 4:
