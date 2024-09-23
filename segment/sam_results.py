@@ -52,6 +52,7 @@ def format_results(labels, scores, boxes, masks, labels_dict, person_masks_only=
         assert person_mask is not None, "Person mask not found in results"
 
         # Remove any results that do no overlap with the person
+        # The purpose of this is to ensure that you are not getting masks for objects that are not on the person
         results_dict = remove_non_person_masks(person_mask, results_dict)
 
     return results_dict

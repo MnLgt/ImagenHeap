@@ -87,10 +87,19 @@ def display_image_with_masks(image, results, cols=4):
     plt.show()
 
 
+# def unload_mask(mask):
+#     mask = mask.cpu().numpy().squeeze()
+#     mask = mask.astype(np.uint8) * 255
+#     return Image.fromarray(mask)
+
+
 def unload_mask(mask):
+    # permute the mask to the right order
+    mask = mask.permute(1, 2, 0)
+
     mask = mask.cpu().numpy().squeeze()
     mask = mask.astype(np.uint8) * 255
-    return Image.fromarray(mask)
+    return Image.fromarray(mask).convert("L")
 
 
 def unload_box(box):

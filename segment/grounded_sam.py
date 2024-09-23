@@ -19,6 +19,7 @@ import numpy as np
 # diffusers
 import torch
 import torchvision
+from typing import List, Union
 
 # Grounding DINO
 import GroundingDINO.groundingdino.datasets.transforms as T
@@ -51,25 +52,32 @@ def load_model(model_config_path, model_checkpoint_path, device):
 
 device = get_device()
 
+CURDIR = os.path.dirname(__file__)
 
+WEIGHTS_DIR = os.path.join(CURDIR, "..", "weights")
+
+# Dino
+GROUNDED_DIR = os.path.join(CURDIR, "..", "GroundingDINO")
+GROUNDED_CHECKPOINT = os.path.join(WEIGHTS_DIR,"groundingdino_swint_ogc.pth")
+GROUNDED_CONFIG = os.path.join(GROUNDED_DIR, "groundingdino/config/GroundingDINO_SwinT_OGC.py")
+
+# SAM
+SAM_CHECKPOINT = os.path.join(WEIGHTS_DIR, "sam_vit_h_4b8939.pth")
 ckpt_repo_id = "ShilongLiu/GroundingDINO"
 
 
 @lru_cache(maxsize=1)
 def get_grounding_model():
-    ckpt_filename = "weights/groundingdino_swint_ogc.pth"
-    config_file = "GroundingDINO/groundingdino/config/GroundingDINO_SwinT_OGC.py"
-    groundingdino_model = load_model(config_file, ckpt_filename, device=device).to(
-        device
-    )
+    groundingdino_model = load_model(
+        GROUNDED_CONFIG, GROUNDED_CHECKPOINT, device=device
+    ).to(device)
     return groundingdino_model.to(device)
 
 
 @lru_cache(maxsize=1)
 def get_sam_model():
-    sam_checkpoint = "weights/sam_vit_h_4b8939.pth"
     # SAM PREDICTOR
-    sam = build_sam(checkpoint=sam_checkpoint)
+    sam = build_sam(checkpoint=SAM_CHECKPOINT)
     return sam.to(device=device)
 
 
@@ -93,8 +101,7 @@ def caption_handler(caption, images):
     processed_captions = [caption] * len(images)
     return processed_captions
 
-
-def transform_image_dino(image_pil):
+def transform_image_dino(image_pil: Image.Image) -> torch.tensor:
 
     transform = T.Compose(
         [

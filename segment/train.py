@@ -40,7 +40,7 @@ def main():
     # Train Settings
     train_config = get_train_config()
 
-    wandb.init(project=project)
+    wandb.init(dir='training',project=project)
 
     # Load a model
     model = YOLO(
