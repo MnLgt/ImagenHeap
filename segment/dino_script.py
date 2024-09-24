@@ -8,24 +8,23 @@ warnings.filterwarnings(action="ignore", category=UserWarning)
 warnings.filterwarnings(action="ignore", category=FutureWarning)
 
 import os
-from PIL import Image
 from functools import lru_cache
-
-from typing import List, Tuple
-
+from typing import List, Tuple, Callable
 
 # Grounding DINO
 import GroundingDINO.groundingdino.datasets.transforms as T
-from GroundingDINO.groundingdino.models import build_model
-from GroundingDINO.groundingdino.util.slconfig import SLConfig
-from GroundingDINO.groundingdino.util.utils import clean_state_dict
-from GroundingDINO.groundingdino.util.utils import get_phrases_from_posmap
-from segment.sam_results import format_boxes 
-from segment.sam_results import format_scores 
 import torch
 import torchvision
-from segment.utils import get_device
+from GroundingDINO.groundingdino.models import build_model
+from GroundingDINO.groundingdino.util.slconfig import SLConfig
+from GroundingDINO.groundingdino.util.utils import (
+    clean_state_dict,
+    get_phrases_from_posmap,
+)
+from PIL import Image
 
+from segment.sam_results import format_boxes, format_scores
+from segment.utils import get_device, image_handler, load_resize_image
 
 DEVICE = get_device()
 
@@ -122,8 +121,15 @@ def transform_image_dino(image_pil: Image.Image) -> torch.tensor:
 
 
 def run_dino(
-    dino_model, images, caption: str, box_threshold: float = 0.3, text_threshold:int = 0.25, **kwargs
+    dino_model: Callable,
+    images: torch.tensor,
+    caption: str,
+    box_threshold: float = 0.3,
+    text_threshold: int = 0.25,
+    **kwargs,
 ) -> Tuple[List[torch.Tensor], List[torch.Tensor], List[List[str]]]:
+
+    # Process caption
     processed_captions = caption_handler(caption, images)
 
     # Ensure images is a batch (first dimension is batch size)
@@ -146,20 +152,26 @@ def run_dino(
 
     # Compute max logits once
     max_logits = [logits.max(dim=1) for logits in batch_logits]
-    
+
     filtered_batch_boxes = []
     filtered_predicts_batch = []
     filtered_phrases_batch = []
 
-    for batch_idx, (batch_logit, max_logit, boxes) in enumerate(zip(batch_logits, max_logits, batch_boxes)):
+    for batch_idx, (batch_logit, max_logit, boxes) in enumerate(
+        zip(batch_logits, max_logits, batch_boxes)
+    ):
         logit_mask = max_logit.values > text_threshold
-        
+
         filtered_batch_boxes.append(boxes[logit_mask])
         filtered_predicts_batch.append(max_logit.values[logit_mask])
-        
+
         filtered_phrases = [
-            get_phrases_from_posmap(logit == max_val, tokenized, tokenizer).replace(".", "")
-            for logit, max_val in zip(batch_logit[logit_mask], max_logit.values[logit_mask])
+            get_phrases_from_posmap(logit == max_val, tokenized, tokenizer).replace(
+                ".", ""
+            )
+            for logit, max_val in zip(
+                batch_logit[logit_mask], max_logit.values[logit_mask]
+            )
         ]
         filtered_phrases_batch.append(filtered_phrases)
 
@@ -203,22 +215,25 @@ def format_dino(
 
     return batch_final_boxes, batch_final_scores, batch_final_phrases
 
+
 class DinoResults:
     def __init__(self, boxes, scores, phrases):
         self.boxes = boxes
         self.scores = scores
         self.phrases = phrases
-        
+
     def asdict(self):
         boxes = format_boxes(self.boxes[0])
         scores = format_scores(self.scores[0])
         phrases = self.phrases[0]
-        return [dict(box=box, score=score, label=phrases[idx]) for idx, (box, score) in enumerate(zip(boxes, scores))]
-
+        return [
+            dict(box=box, score=score, label=phrases[idx])
+            for idx, (box, score) in enumerate(zip(boxes, scores))
+        ]
 
 
 def get_dino_results(
-    images: List[Image.Image],
+    images: str | Image.Image | List[Image.Image],
     text_prompt: str,
     device: torch.device = DEVICE,
     box_threshold=0.3,
@@ -240,7 +255,7 @@ def get_dino_results(
     Returns:
     tuple: A tuple containing the boxes, scores, and phrases.
     """
-
+    images = image_handler(images)
     # Load DINO model
     dino_model = get_dino_model()
 
@@ -250,7 +265,11 @@ def get_dino_results(
 
     # Process with DINO model
     boxes, scores, phrases = run_dino(
-        dino_model, dino_images, text_prompt, box_threshold,text_threshold=text_threshold
+        dino_model,
+        dino_images,
+        text_prompt,
+        box_threshold,
+        text_threshold=text_threshold,
     )
     boxes, scores, phrases = format_dino(
         boxes, scores, phrases, iou_threshold=iou_threshold
@@ -261,7 +280,9 @@ def get_dino_results(
 
 if __name__ == "__main__":
     from pathlib import Path
+
     from PIL import Image
+
     from segment.utils import resize_image_pil
 
     def load_image(image_path):

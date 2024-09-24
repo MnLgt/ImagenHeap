@@ -1,7 +1,8 @@
 import numpy as np
-from segment.utils import display_image_with_masks, unload_box, unload_mask
-from segment.utils import get_coco_style_polygons
 from PIL import ImageDraw
+
+from segment.utils import (display_image_with_masks, get_coco_style_polygons,
+                           unload_box, unload_mask)
 
 
 def format_scores(scores):
@@ -16,11 +17,12 @@ def format_boxes(boxes):
     return [unload_box(box) for box in boxes]
 
 
+from itertools import groupby
+from operator import itemgetter
+
 # determine whether two masks overlap
 import numpy as np
 from PIL import Image
-from itertools import groupby
-from operator import itemgetter
 
 
 def compute_mask_overlap(mask1, mask2):

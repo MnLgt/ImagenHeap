@@ -1,12 +1,15 @@
+import time
+from typing import List
+
 import cv2
 import matplotlib.patches as patches
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
+from diffusers.utils import load_image
 from PIL import Image, ImageOps
 from torchvision.transforms import functional as F
-import time 
-from diffusers.utils import load_image
+
 
 def time_decorator(func):
     def wrapper(*args, **kwargs):
@@ -18,6 +21,7 @@ def time_decorator(func):
         return result
 
     return wrapper
+
 
 def get_device():
     if torch.cuda.is_available():
@@ -261,8 +265,9 @@ def resize_image_pil(image_pil, max_size=1024):
 
     return image_pil
 
+
 # Function for resizing an image to a specific size without changing the aspect ratio
-def load_resize_image(image_path: str | Image.Image, size: int) -> Image.Image:
+def load_resize_image(image_path: str | Image.Image, size: int = 1024) -> Image.Image:
     if isinstance(image_path, str):
         image_pil = load_image(image_path).convert("RGB")
     else:
@@ -270,3 +275,19 @@ def load_resize_image(image_path: str | Image.Image, size: int) -> Image.Image:
 
     image_pil = resize_image_pil(image_pil, size)
     return image_pil
+
+
+def image_handler(image: str | Image.Image | List[Image.Image], size: int = 1024):
+    """
+    Takes an image path, a PIL image or a list of PIL images and returns a list of PIL images resized to 1024x1024.
+    """
+    if isinstance(image, str):
+        image = load_resize_image(image, size)
+        return [image]
+    elif isinstance(image, Image.Image):
+        image = resize_image_pil(image, size)
+        return [image]
+    elif isinstance(image, list):
+        return [load_resize_image(img, size) for img in image]
+    else:
+        raise ValueError("Image must be a string, PIL Image, or list of PIL Images.")

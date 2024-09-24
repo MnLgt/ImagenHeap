@@ -8,17 +8,17 @@ warnings.filterwarnings(action="ignore", category=UserWarning)
 warnings.filterwarnings(action="ignore", category=FutureWarning)
 
 import os
-from typing import List
-from PIL import Image
-
 from functools import lru_cache
-import torch
-import numpy as np
-from segment.dino_script import DinoResults
+from typing import List
 
+import numpy as np
+import torch
+from PIL import Image
 # segment anything
 from segment_anything import build_sam
 from segment_anything.utils.transforms import ResizeLongestSide
+
+from segment.dino_script import DinoResults
 from segment.utils import get_device
 
 DEVICE = get_device()
