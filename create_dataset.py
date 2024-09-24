@@ -13,7 +13,7 @@ from typing import List, Dict, Any, Callable
 from pathlib import Path
 from PIL import Image
 from segment.utils import resize_image_pil
-from segment.dino_script import get_dino_results
+from segment.dino_script import DinoDetector
 from segment.sam_script import get_sam_results
 from segment.utils import get_device
 from segment.sam_results import SAMResults
@@ -88,8 +88,9 @@ def get_metadata(
     images = [load_resize_image(im, size) for im in image_paths]
 
     # Get the boxes from the prompts using DINO
-    dino_results = get_dino_results(images, text_prompt, device, **kwargs)
-
+    dino_results = DinoDetector(images, text_prompt, **kwargs)
+    dino_results.run()
+    
     # Get the masks from the images and boxes using SAM
     unformatted_results = get_sam_results(images, dino_results, text_prompt)
 

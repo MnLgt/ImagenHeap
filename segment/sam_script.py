@@ -18,7 +18,7 @@ from PIL import Image
 from segment_anything import build_sam
 from segment_anything.utils.transforms import ResizeLongestSide
 
-from segment.dino_script import DinoResults
+from segment.dino_script import DinoDetector
 from segment.utils import get_device
 
 DEVICE = get_device()
@@ -124,7 +124,7 @@ def sam_process(results, sam_model, sam_images, multimask_output=False):
 
 def get_sam_results(
     images: List[Image.Image],
-    dino_results: DinoResults,
+    dino_results: DinoDetector,
     text_prompt: str,
     device: torch.device = DEVICE,
     multimask_output: bool = False,

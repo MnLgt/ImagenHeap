@@ -9,22 +9,24 @@ warnings.filterwarnings(action="ignore", category=FutureWarning)
 
 import os
 from functools import lru_cache
-from typing import List, Tuple, Callable
+from typing import Callable, List, Tuple, Union
 
+import cv2
 # Grounding DINO
 import GroundingDINO.groundingdino.datasets.transforms as T
+import matplotlib.pyplot as plt
+import numpy as np
 import torch
 import torchvision
 from GroundingDINO.groundingdino.models import build_model
 from GroundingDINO.groundingdino.util.slconfig import SLConfig
-from GroundingDINO.groundingdino.util.utils import (
-    clean_state_dict,
-    get_phrases_from_posmap,
-)
+from GroundingDINO.groundingdino.util.utils import (clean_state_dict,
+                                                    get_phrases_from_posmap)
 from PIL import Image
 
 from segment.sam_results import format_boxes, format_scores
 from segment.utils import get_device, image_handler, load_resize_image
+from segment.visualizer import display_image_with_masks_and_boxes
 
 DEVICE = get_device()
 
@@ -216,11 +218,89 @@ def format_dino(
     return batch_final_boxes, batch_final_scores, batch_final_phrases
 
 
-class DinoResults:
-    def __init__(self, boxes, scores, phrases):
-        self.boxes = boxes
-        self.scores = scores
-        self.phrases = phrases
+class DinoDetector:
+    """
+    A class for detecting and highlighting objects in images using the DINO (Detection Transformer) model.
+
+    This class can process images from various input formats, detect objects based on a text prompt,
+    and display the results.
+
+    Attributes:
+        image_size (int): The size to which input images will be resized (default: 1024).
+        device (torch.device): The device on which computations will be performed.
+        images (List[Image.Image]): List of PIL Image objects to be processed.
+        dino_images (torch.Tensor): Tensor of transformed images ready for DINO model input.
+        text_prompt (str): A string of words to detect, separated by periods.
+        model: The loaded DINO model.
+        box_threshold (float): Confidence threshold for bounding boxes (default: 0.3).
+        text_threshold (float): Confidence threshold for text detection (default: 0.25).
+        iou_threshold (float): Intersection over Union threshold for box merging (default: 0.8).
+        boxes (torch.Tensor): Detected bounding boxes.
+        scores (torch.Tensor): Confidence scores for detected boxes.
+        phrases (List[str]): Detected phrases corresponding to boxes.
+
+    Args:
+        image (Union[str, Image.Image, List[Image.Image]]): Input image(s) as file path, PIL Image, or list of PIL Images.
+        text_prompt (str): A string of words to detect, separated by periods.
+        image_size (int, optional): Size to resize input images (default: 1024).
+        box_threshold (float, optional): Confidence threshold for bounding boxes (default: 0.3).
+        text_threshold (float, optional): Confidence threshold for text detection (default: 0.25).
+        iou_threshold (float, optional): Intersection over Union threshold for box merging (default: 0.8).
+
+    Example:
+        im_path = "https://i.pinimg.com/originals/68/82/ce/6882cefe21f75234697e8508eb6a3232.jpg"
+        text_prompt = ["hair", "face", "neck", "arm", "hand", "back", "leg", "clothing", "phone", "hat", "foot"]
+        text_prompt = ".".join(text_prompt)
+        
+        detector = DinoDetector(im_path, text_prompt)
+        detector.run()
+        detector.display_results()
+    """
+    def __init__(
+        self,
+        image: Union[str, Image.Image, List[Image.Image]],
+        text_prompt: str,
+        image_size: int = 1024,
+        box_threshold: float = 0.3,
+        text_threshold: float = 0.25,
+        iou_threshold: float = 0.8,
+    ):
+        self.image_size = image_size
+        self.device = DEVICE
+        self.images = image_handler(image, self.image_size)
+        self.dino_images = self.image_to_tensor()
+        self.text_prompt = text_prompt
+        self.model = self._get_dino_model()
+        self.box_threshold = box_threshold
+        self.text_threshold = text_threshold
+        self.iou_threshold = iou_threshold
+        self.boxes = None
+        self.scores = None
+        self.phrases = None
+
+    def _get_dino_model(self):
+        return get_dino_model()
+
+    def image_to_tensor(self):
+        with torch.no_grad():
+            dino_images = torch.stack(
+                [transform_image_dino(image) for image in self.images]
+            )
+        return dino_images.to(self.device)
+
+    def run(self):
+        self.boxes, self.scores, self.phrases = run_dino(
+            self.model,
+            self.dino_images,
+            self.text_prompt,
+            self.box_threshold,
+            self.text_threshold,
+        )
+
+        self.boxes, self.scores, self.phrases = format_dino(
+            self.boxes, self.scores, self.phrases, (self.image_size, self.image_size), self.iou_threshold
+        )
+    
 
     def asdict(self):
         boxes = format_boxes(self.boxes[0])
@@ -231,71 +311,10 @@ class DinoResults:
             for idx, (box, score) in enumerate(zip(boxes, scores))
         ]
 
-
-def get_dino_results(
-    images: str | Image.Image | List[Image.Image],
-    text_prompt: str,
-    device: torch.device = DEVICE,
-    box_threshold=0.3,
-    text_threshold=0.25,
-    iou_threshold=0.8,
-    **kwargs,
-) -> DinoResults:
-    """
-    Run the DINO model on an image and text prompt.
-
-    Args:
-    image (Image.Image): A list of images to process.
-    text_prompt (str): The text prompt to use.
-    device (torch.device): The device to run the model on.
-    box_threshold (float): The box threshold.
-    text_threshold (float): The text threshold.
-    iou_threshold (float): The IoU threshold.
-
-    Returns:
-    tuple: A tuple containing the boxes, scores, and phrases.
-    """
-    images = image_handler(images)
-    # Load DINO model
-    dino_model = get_dino_model()
-
-    with torch.no_grad():
-        dino_images = torch.stack([transform_image_dino(image) for image in images])
-        dino_images = dino_images.to(device)
-
-    # Process with DINO model
-    boxes, scores, phrases = run_dino(
-        dino_model,
-        dino_images,
-        text_prompt,
-        box_threshold,
-        text_threshold=text_threshold,
-    )
-    boxes, scores, phrases = format_dino(
-        boxes, scores, phrases, iou_threshold=iou_threshold
-    )
-    results = DinoResults(boxes, scores, phrases)
-    return results
-
-
-if __name__ == "__main__":
-    from pathlib import Path
-
-    from PIL import Image
-
-    from segment.utils import resize_image_pil
-
-    def load_image(image_path):
-        image_pil = Image.open(image_path).convert("RGB")
-        image_pil = resize_image_pil(image_pil, 1024)
-        return image_pil
-
-    image_dir = Path("../datasets/fashion_people_detection/images/val")
-    image_paths = list(image_dir.glob("*.jpg"))
-
-    images = [load_image(path) for path in image_paths[:20]]
-
-    results = get_dino_results(images, "legs", DEVICE)
-    print(f"Boxes: {results.boxes}")
-    print(f"Scores: {results.scores}")
-    print(f"Phrases: {results.phrases}")
+    def display_results(
+        self,
+        image_num=0,
+        cols: int = 4,
+    ):
+        # Convert PIL Image to numpy array
+        display_image_with_masks_and_boxes(self.images[image_num], self.asdict(), cols=cols)

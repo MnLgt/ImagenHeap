@@ -1,8 +1,8 @@
 import numpy as np
 from PIL import ImageDraw
 
-from segment.utils import (display_image_with_masks, get_coco_style_polygons,
-                           unload_box, unload_mask)
+from segment.utils import get_coco_style_polygons, unload_box, unload_mask
+from segment.visualizer import display_image_with_masks_and_boxes
 
 
 def format_scores(scores):
@@ -255,7 +255,7 @@ class SAMResults:
             cols = len(self.masks)
         else:
             cols = 4
-        return display_image_with_masks(self.image, self.formatted_results, cols=cols)
+        return display_image_with_masks_and_boxes(self.image, self.formatted_results, cols=cols)
 
     def get_mask(self, mask_label):
         assert mask_label in self.labels, "Mask label not found in results"
