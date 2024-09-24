@@ -28,3 +28,7 @@ The purpose of this module:
 Build tools for dataset quality control: 
 - bar chart of class distribution
 - Add a filter for the dataset to filter out images below a certain score 
+- Add the text_threshold in to the dino_script.py 
+```python 
+pred_phrase = get_phrases_from_posmap(logit > text_threshold, tokenized, tokenlizer)
+```
