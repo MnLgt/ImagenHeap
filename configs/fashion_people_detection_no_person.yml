@@ -4,7 +4,7 @@ train: images/train  # train images (relative to path) 4 images
 val: images/val  # val images (relative to path) 4 images
 # test:  # test images (optional)
 
-# Classes (80 COCO classes)
+# Classes (80 COCO classes) 
 names:
   0: hair
   1: face
@@ -17,7 +17,7 @@ names:
   8: outfit
   9: phone
   10: hat
-  11: glasses
+  11: shoe
 
 colors:
   - [0, 0, 0]        # background: Black
@@ -32,4 +32,4 @@ colors:
   - [75, 0, 130]     # outfit: Dark Purple
   - [255, 192, 203]  # phone: Pink
   - [46, 139, 87]    # hat: Sea Green
-  - [0, 0, 128]      # glasses: Navy
+  - [255, 215, 0]    # shoe: Gold

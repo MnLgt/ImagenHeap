@@ -7,11 +7,14 @@ if [[ -z "$VIRTUAL_ENV" && -z "$CONDA_PREFIX" ]]; then
     exit 1
 fi
 
+echo "Upgrading pip"
+pip install -U pip
+
 echo "Installing git lfs"
 git lfs install
 
-echo "Cloning GroundingDINO repo"
-git clone https://github.com/IDEA-Research/GroundingDINO.git
+# echo "Cloning GroundingDINO repo"
+# git clone https://github.com/IDEA-Research/GroundingDINO.git
 
 # Install segment-anything 
 pip install git+https://github.com/facebookresearch/segment-anything.git
@@ -23,20 +26,21 @@ python -m pip install -e GroundingDINO
 pip install --upgrade diffusers[torch]
 pip install opencv-python pycocotools matplotlib onnxruntime onnx ipykernel
 
-echo "Downloading weights"
-# check if weights dir exists
-if [ ! -d "weights" ]; then
-    mkdir weights
-fi
-# check if groundingdino weights exists
-if [ ! -f "weights/groundingdino_swint_ogc.pth" ]; then
-    wget https://huggingface.co/ShilongLiu/GroundingDINO/resolve/main/groundingdino_swint_ogc.pth -O weights/groundingdino_swint_ogc.pth
-fi
+# echo "Downloading weights"
+# # check if weights dir exists
+# if [ ! -d "weights" ]; then
+#     mkdir weights
+# fi
 
-# check if sam_vit_h_4b8939.pth exists
-if [ ! -f "weights/sam_vit_h_4b8939.pth" ]; then
-    wget https://huggingface.co/spaces/mrtlive/segment-anything-model/resolve/main/sam_vit_h_4b8939.pth -O weights/sam_vit_h_4b8939.pth
-fi
+# # check if groundingdino weights exists
+# if [ ! -f "weights/groundingdino_swint_ogc.pth" ]; then
+#     wget https://huggingface.co/ShilongLiu/GroundingDINO/resolve/main/groundingdino_swint_ogc.pth -O weights/groundingdino_swint_ogc.pth
+# fi
+
+# # check if sam_vit_h_4b8939.pth exists
+# if [ ! -f "weights/sam_vit_h_4b8939.pth" ]; then
+#     wget https://huggingface.co/spaces/mrtlive/segment-anything-model/resolve/main/sam_vit_h_4b8939.pth -O weights/sam_vit_h_4b8939.pth
+# fi
 
 echo "Registering Venv"
 pip install ipykernel ipywidgets

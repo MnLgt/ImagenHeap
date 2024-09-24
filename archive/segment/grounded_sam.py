@@ -36,6 +36,8 @@ from segment_anything import build_sam
 from segment_anything.utils.transforms import ResizeLongestSide
 from segment.utils import get_device
 
+# This was the first attempt at marrying the groundingdino model with the sam model
+# We separated out the dino and sam logic into separate scripts for cleaner implementation
 
 def load_model(model_config_path, model_checkpoint_path, device):
     args = SLConfig.fromfile(model_config_path)

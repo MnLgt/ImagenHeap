@@ -20,6 +20,8 @@ from GroundingDINO.groundingdino.models import build_model
 from GroundingDINO.groundingdino.util.slconfig import SLConfig
 from GroundingDINO.groundingdino.util.utils import clean_state_dict
 from GroundingDINO.groundingdino.util.utils import get_phrases_from_posmap
+from segment.sam_results import format_boxes 
+from segment.sam_results import format_scores 
 import torch
 import torchvision
 from segment.utils import get_device
@@ -196,21 +198,28 @@ def format_dino(
 
     return batch_final_boxes, batch_final_scores, batch_final_phrases
 
-
 class DinoResults:
     def __init__(self, boxes, scores, phrases):
         self.boxes = boxes
         self.scores = scores
         self.phrases = phrases
+        
+    def asdict(self):
+        boxes = format_boxes(self.boxes[0])
+        scores = format_scores(self.scores[0])
+        phrases = self.phrases[0]
+        return [dict(box=box, score=score, label=phrases[idx]) for idx, (box, score) in enumerate(zip(boxes, scores))]
+
 
 
 def get_dino_results(
     images: List[Image.Image],
     text_prompt: str,
-    device: torch.device,
+    device: torch.device = DEVICE,
     box_threshold=0.3,
     text_threshold=0.25,
     iou_threshold=0.8,
+    **kwargs,
 ) -> DinoResults:
     """
     Run the DINO model on an image and text prompt.
@@ -230,8 +239,9 @@ def get_dino_results(
     # Load DINO model
     dino_model = get_dino_model()
 
-    dino_images = torch.stack([transform_image_dino(image) for image in images])
-    dino_images = dino_images.to(device)
+    with torch.no_grad():
+        dino_images = torch.stack([transform_image_dino(image) for image in images])
+        dino_images = dino_images.to(device)
 
     # Process with DINO model
     boxes, scores, phrases = run_dino(

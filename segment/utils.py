@@ -5,7 +5,19 @@ import numpy as np
 import torch
 from PIL import Image, ImageOps
 from torchvision.transforms import functional as F
+import time 
+from diffusers.utils import load_image
 
+def time_decorator(func):
+    def wrapper(*args, **kwargs):
+        start = time.time()
+        result = func(*args, **kwargs)
+        end = time.time()
+        duration = end - start
+        print(f"{round(duration,2)} seconds: {func.__name__}")
+        return result
+
+    return wrapper
 
 def get_device():
     if torch.cuda.is_available():
@@ -247,4 +259,14 @@ def resize_image_pil(image_pil, max_size=1024):
         fill=(0, 0, 0),
     )
 
+    return image_pil
+
+# Function for resizing an image to a specific size without changing the aspect ratio
+def load_resize_image(image_path: str | Image.Image, size: int) -> Image.Image:
+    if isinstance(image_path, str):
+        image_pil = load_image(image_path).convert("RGB")
+    else:
+        image_pil = image_path.convert("RGB")
+
+    image_pil = resize_image_pil(image_pil, size)
     return image_pil

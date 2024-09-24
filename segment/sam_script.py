@@ -99,16 +99,16 @@ def sam_process(results, sam_model, sam_images, multimask_output=False):
         )
         valid_masks = [output.get("masks") for output in sam_outputs]
 
-        # Filter scores and phrases manually
-        valid_scores = [
-            score for score, is_valid in zip(scores, valid_mask) if is_valid
-        ]
+        valid_scores = [output.get("iou_predictions") for output in sam_outputs]
+
+        # Filter phrases manually
         valid_phrases = [
             phrase for phrase, is_valid in zip(phrases, valid_mask) if is_valid
         ]
 
         # Fill in the output for valid entries
         valid_indices = valid_mask.nonzero().squeeze(1)
+
         for i, (mask, box, score, phrase) in enumerate(
             zip(valid_masks, valid_boxes, valid_scores, valid_phrases)
         ):
@@ -131,11 +131,12 @@ def get_sam_results(
 ) -> List[dict]:
     sam_model = get_sam_model()
 
-    # dino_images = torch.stack([transform_image_dino(image) for image in images])
-    sam_images = torch.stack([sam_transform_image(image) for image in images])
+    with torch.no_grad():
+        # dino_images = torch.stack([transform_image_dino(image) for image in images])
+        sam_images = torch.stack([sam_transform_image(image) for image in images])
 
-    # dino_images = dino_images.to(DEVICE)
-    sam_images = sam_images.to(DEVICE)
+        # dino_images = dino_images.to(DEVICE)
+        sam_images = sam_images.to(DEVICE)
 
     unformatted_results = sam_process(
         dino_results, sam_model, sam_images, multimask_output
