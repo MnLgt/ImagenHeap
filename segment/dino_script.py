@@ -122,7 +122,7 @@ def transform_image_dino(image_pil: Image.Image) -> torch.tensor:
 
 
 def run_dino(
-    dino_model, images, caption: str, box_threshold: float = 0.3, **kwargs
+    dino_model, images, caption: str, box_threshold: float = 0.3, text_threshold:int = 0.25, **kwargs
 ) -> Tuple[List[torch.Tensor], List[torch.Tensor], List[List[str]]]:
     processed_captions = caption_handler(caption, images)
 
@@ -146,19 +146,24 @@ def run_dino(
 
     # Compute max logits once
     max_logits = [logits.max(dim=1) for logits in batch_logits]
-    predicts_batch = [max_logit.values for max_logit in max_logits]
+    
+    filtered_batch_boxes = []
+    filtered_predicts_batch = []
+    filtered_phrases_batch = []
 
-    phrases_batch = [
-        [
-            get_phrases_from_posmap(logit == max_val, tokenized, tokenizer).replace(
-                ".", ""
-            )
-            for logit, max_val in zip(batch_logit, max_logit.values)
+    for batch_idx, (batch_logit, max_logit, boxes) in enumerate(zip(batch_logits, max_logits, batch_boxes)):
+        logit_mask = max_logit.values > text_threshold
+        
+        filtered_batch_boxes.append(boxes[logit_mask])
+        filtered_predicts_batch.append(max_logit.values[logit_mask])
+        
+        filtered_phrases = [
+            get_phrases_from_posmap(logit == max_val, tokenized, tokenizer).replace(".", "")
+            for logit, max_val in zip(batch_logit[logit_mask], max_logit.values[logit_mask])
         ]
-        for batch_logit, max_logit in zip(batch_logits, max_logits)
-    ]
+        filtered_phrases_batch.append(filtered_phrases)
 
-    return batch_boxes, predicts_batch, phrases_batch
+    return filtered_batch_boxes, filtered_predicts_batch, filtered_phrases_batch
 
 
 def format_dino(
@@ -245,7 +250,7 @@ def get_dino_results(
 
     # Process with DINO model
     boxes, scores, phrases = run_dino(
-        dino_model, dino_images, text_prompt, box_threshold
+        dino_model, dino_images, text_prompt, box_threshold,text_threshold=text_threshold
     )
     boxes, scores, phrases = format_dino(
         boxes, scores, phrases, iou_threshold=iou_threshold

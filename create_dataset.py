@@ -9,7 +9,7 @@ warnings.filterwarnings(action="ignore", category=UserWarning)
 warnings.filterwarnings(action="ignore", category=FutureWarning)
 
 import os
-from typing import List, Dict
+from typing import List, Dict, Any, Callable
 from pathlib import Path
 from PIL import Image
 from segment.utils import resize_image_pil
@@ -58,12 +58,12 @@ def load_resize_image(image_path: str | Image.Image, size: int) -> Image.Image:
 
 
 # Convert the results to SamResults formatted results
-def load_all_in_sam(images, unformatted_results, labels_dict):
+def load_all_in_sam(images, unformatted_results, labels_dict, **kwargs):
     results = []
     for image, uf in zip(images, unformatted_results):
         try:
             result = SAMResults(
-                image, labels_dict, **uf, person_masks_only=False
+                image, labels_dict, **uf, person_masks_only=False, **kwargs
             ).formatted_results
         except Exception as e:
             print(f"One Image had an error: {e}")
@@ -93,7 +93,7 @@ def get_metadata(
     # Get the masks from the images and boxes using SAM
     unformatted_results = get_sam_results(images, dino_results, text_prompt)
 
-    return load_all_in_sam(images, unformatted_results, labels_dict)
+    return load_all_in_sam(images, unformatted_results, labels_dict, **kwargs)
 
 
 # loading yaml config file
@@ -139,30 +139,48 @@ def remove_masks(batch_results):
     return batch_results
 
 
-def process_batch(batch, text_prompt, labels_dict, get_metadata_func, batch_size=32, **kwargs):
-    # Assuming 'image' is the column name containing image paths or PIL Images
+def process_batch(
+    batch: Dict[str, Any],
+    text_prompt: str,
+    labels_dict: Dict[str, Any],
+    get_metadata_func: Callable,
+    batch_size: int = 32,
+    **kwargs
+) -> Dict[str, List[Dict[str, Any]]]:
+    """
+    Process a batch of images and retrieve metadata.
+
+    Args:
+        batch (Dict[str, Any]): The input batch containing image paths or PIL Images.
+        text_prompt (str): The text prompt to use for metadata retrieval.
+        labels_dict (Dict[str, Any]): Dictionary of labels for metadata retrieval.
+        get_metadata_func (Callable): Function to retrieve metadata for a batch of images.
+        batch_size (int, optional): Size of sub-batches for processing. Defaults to 32.
+        **kwargs: Additional keyword arguments to pass to get_metadata_func.
+
+    Returns:
+        Dict[str, List[Dict[str, Any]]]: A dictionary containing the 'metadata' key with a list of metadata results.
+    """
     image_paths = batch["image"]
-
-    # Process images in smaller sub-batches
     results = []
-    pbar = tqdm(range(0, len(image_paths), batch_size), position=0, leave=False)
 
-    for i in pbar:
-        pbar.set_description(f"Sub Batch: {i}")
-        sub_batch = image_paths[i : i + batch_size]
-        # You might need to adjust these parameters based on your get_metadata function
-        batch_results = get_metadata_func(
-            text_prompt=text_prompt,  # You need to define this
-            image_paths=sub_batch,
-            labels_dict=labels_dict,  # You need to define this
-            **kwargs,
-        )
+    with tqdm(total=len(image_paths), desc="Processing Images", unit="img") as pbar:
+        for i in range(0, len(image_paths), batch_size):
+            sub_batch = image_paths[i:i + batch_size]
+            pbar.set_description(f"Sub Batch: {i // batch_size + 1}")
 
-        # Remove Masks Since They Are in PIL Format
-        if batch_results:
-            remove_masks(batch_results)
+            batch_results = get_metadata_func(
+                text_prompt=text_prompt,
+                image_paths=sub_batch,
+                labels_dict=labels_dict,
+                **kwargs
+            )
 
-        results.extend(batch_results)
+            if batch_results:
+                remove_masks(batch_results)
+                results.extend(batch_results)
+
+            pbar.update(len(sub_batch))
 
     return {"metadata": results}
 
@@ -263,9 +281,10 @@ class CreateSegmentationDataset:
         ds: Dataset,
         config_path: str,
         metadata_col: str = "metadata",
-        bs: int = 100,
+        bs: int = 64,
         sub_bs: int = 8,
         box_threshold: int = 0.3,
+        text_threshold: int = 0.25,
         iou_threshold: int = 0.8,
     ):
         self.ds = ds
@@ -278,6 +297,7 @@ class CreateSegmentationDataset:
         self.sub_bs = sub_bs
         self.processed_ds = None
         self.box_threshold = box_threshold
+        self.text_threshold = text_threshold
         self.iou_threshold = iou_threshold
         
 
@@ -312,6 +332,7 @@ class CreateSegmentationDataset:
             batch_size=self.bs,
             sub_batch_size=self.sub_bs,
             box_threshold=self.box_threshold,
+            text_threshold=self.text_threshold,
             iou_threshold=self.iou_threshold,
         )
 
