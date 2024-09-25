@@ -2,7 +2,17 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 
-def display_image_with_masks_and_boxes(image, results, cols=4):
+
+def display_image_with_masks_and_boxes(
+    image,
+    results,
+    box_label="box",
+    mask_label="mask",
+    prompt_label="prompt",
+    score_label="score",
+    cols=4,
+    **kwargs,
+):
     # Convert PIL Image to numpy array
     image_np = np.array(image)
 
@@ -24,8 +34,8 @@ def display_image_with_masks_and_boxes(image, results, cols=4):
         axs = axs.reshape(rows, cols)
 
     for i, result in enumerate(results):
-        label = result["label"]
-        score = float(result["score"])
+        label = result[prompt_label]
+        score = float(result[score_label])
 
         row = i // cols
         col = i % cols
@@ -34,8 +44,8 @@ def display_image_with_masks_and_boxes(image, results, cols=4):
         combined = image_np.copy()
 
         # Draw mask if present
-        if "mask" in result:
-            mask = result["mask"]
+        if mask_label in result:
+            mask = result[mask_label]
             # Convert PIL mask to numpy array
             mask_np = np.array(mask)
 
@@ -58,14 +68,11 @@ def display_image_with_masks_and_boxes(image, results, cols=4):
         ax.set_title(f"Label: {label}, Score: {score:.2f}", fontsize=12)
 
         # Draw bounding box if present
-        if "box" in result:
-            bbox = result["box"]
+        if box_label in result:
+            bbox = result[box_label]
             x1, y1, x2, y2 = bbox
             rect = patches.Rectangle(
-                (x1, y1), x2 - x1, y2 - y1,
-                linewidth=2,
-                edgecolor="r",
-                facecolor="none"
+                (x1, y1), x2 - x1, y2 - y1, linewidth=2, edgecolor="r", facecolor="none"
             )
             ax.add_patch(rect)
 

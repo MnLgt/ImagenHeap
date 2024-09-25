@@ -132,13 +132,13 @@ def run_dino(
 ) -> Tuple[List[torch.Tensor], List[torch.Tensor], List[List[str]]]:
 
     # Process caption
-    processed_captions = caption_handler(caption, images)
+    processed_caption = caption_handler(caption, images)
 
     # Ensure images is a batch (first dimension is batch size)
     images = images.unsqueeze(0) if len(images.shape) == 3 else images
 
     with torch.no_grad():
-        outputs = dino_model(images, captions=processed_captions)
+        outputs = dino_model(images, captions=processed_caption)
 
     prediction_logits = outputs["pred_logits"].cpu().sigmoid()
     prediction_boxes = outputs["pred_boxes"].cpu()
