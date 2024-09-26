@@ -8,7 +8,7 @@ if [[ -z "$VIRTUAL_ENV" && -z "$CONDA_PREFIX" ]]; then
 fi
 
 echo "Upgrading pip"
-pip install -U pip
+pip install -U pip -qqq
 
 echo "Installing git lfs"
 git lfs install
@@ -17,14 +17,21 @@ git lfs install
 # git clone https://github.com/IDEA-Research/GroundingDINO.git
 
 # Install segment-anything 
-pip install git+https://github.com/facebookresearch/segment-anything.git
+echo "Installing segment-anything"
+pip install git+https://github.com/facebookresearch/segment-anything.git -qqq
 
-pip install -r requirements.txt
+echo "Installing requirements"
+pip install -r requirements.txt -qqq
 
 # python -m pip install -e segment_anything
-python -m pip install -e GroundingDINO
-pip install --upgrade diffusers[torch]
-pip install opencv-python pycocotools matplotlib onnxruntime onnx ipykernel
+echo "Installing GroundingDINO"
+python -m pip install -e GroundingDINO -qqq
+
+echo "Installing diffusers"
+pip install --upgrade diffusers[torch] -qqq
+
+echo "Installing other dependencies"
+pip install opencv-python pycocotools matplotlib onnxruntime onnx ipykernel -qqq
 
 # echo "Downloading weights"
 # # check if weights dir exists
@@ -43,7 +50,7 @@ pip install opencv-python pycocotools matplotlib onnxruntime onnx ipykernel
 # fi
 
 echo "Registering Venv"
-pip install ipykernel ipywidgets
+pip install ipykernel ipywidgets -qqq
 python -m ipykernel install --user --name groundingdino
 
 echo "Adding git --global config"

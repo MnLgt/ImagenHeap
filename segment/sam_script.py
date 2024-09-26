@@ -14,6 +14,7 @@ from typing import List
 import numpy as np
 import torch
 from PIL import Image
+
 # segment anything
 from segment_anything import build_sam
 from segment_anything.utils.transforms import ResizeLongestSide
@@ -75,8 +76,11 @@ def sam_detect(
     return batched_output
 
 
-def sam_process(results, sam_model, sam_images, multimask_output=False):
-    boxes, scores, phrases = results.boxes, results.scores, results.phrases
+def sam_process(
+    boxes, phrases, sam_model, sam_images, multimask_output=False, **kwargs
+):
+    assert bool(boxes) == bool(phrases), "Boxes and phrases must be provided together"
+
     batch_size = sam_images.size(0)
 
     # Create a mask for valid (non-empty) boxes
@@ -124,10 +128,10 @@ def sam_process(results, sam_model, sam_images, multimask_output=False):
 
 def get_sam_results(
     images: List[Image.Image],
-    dino_results: DinoDetector,
-    text_prompt: str,
+    boxes: List[torch.Tensor],
+    phrases: List[str],
     device: torch.device = DEVICE,
-    multimask_output: bool = False,
+    **kwargs,
 ) -> List[dict]:
     sam_model = get_sam_model()
 
@@ -138,8 +142,6 @@ def get_sam_results(
         # dino_images = dino_images.to(DEVICE)
         sam_images = sam_images.to(DEVICE)
 
-    unformatted_results = sam_process(
-        dino_results, sam_model, sam_images, multimask_output
-    )
+    unformatted_results = sam_process(boxes, phrases, sam_model, sam_images, **kwargs)
 
     return unformatted_results

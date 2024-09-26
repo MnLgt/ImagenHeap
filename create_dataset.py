@@ -31,7 +31,9 @@ from tqdm.auto import tqdm
 from segment.utils import *
 import pandas as pd
 import random
-
+from huggingface_hub import create_repo
+from IPython.display import display
+from functools import lru_cache
 
 # disable datasets.map progress bar
 from datasets.utils.logging import disable_progress_bar
@@ -90,14 +92,20 @@ def get_metadata(
     # Get the boxes from the prompts using DINO
     dino_results = DinoDetector(images, text_prompt, **kwargs)
     dino_results.run()
-    
+
     # Get the masks from the images and boxes using SAM
-    unformatted_results = get_sam_results(images, dino_results, text_prompt)
+    boxes = dino_results.boxes
+    phrases = dino_results.pred_prompt
+
+    unformatted_results = get_sam_results(
+        images, boxes=boxes, phrases=phrases, **kwargs
+    )
 
     return load_all_in_sam(images, unformatted_results, labels_dict, **kwargs)
 
 
 # loading yaml config file
+@lru_cache(maxsize=None)
 def load_yaml(path):
     with open(path, "r") as file:
         data = yaml.load(file, Loader=yaml.FullLoader)
@@ -105,6 +113,7 @@ def load_yaml(path):
 
 
 # Get the labels dictionary from the config file
+@lru_cache(maxsize=None)
 def get_labels_dict(config_path):
     data = load_yaml(config_path)
     labels_dict = data.get("names")
@@ -146,7 +155,7 @@ def process_batch(
     labels_dict: Dict[str, Any],
     get_metadata_func: Callable,
     batch_size: int = 32,
-    **kwargs
+    **kwargs,
 ) -> Dict[str, List[Dict[str, Any]]]:
     """
     Process a batch of images and retrieve metadata.
@@ -165,16 +174,16 @@ def process_batch(
     image_paths = batch["image"]
     results = []
 
-    with tqdm(total=len(image_paths), desc="Processing Images", unit="img") as pbar:
+    with tqdm(total=len(image_paths), desc="Processing Images", unit="img", leave=False, position=1) as pbar:
         for i in range(0, len(image_paths), batch_size):
-            sub_batch = image_paths[i:i + batch_size]
+            sub_batch = image_paths[i : i + batch_size]
             pbar.set_description(f"Sub Batch: {i // batch_size + 1}")
 
             batch_results = get_metadata_func(
                 text_prompt=text_prompt,
                 image_paths=sub_batch,
                 labels_dict=labels_dict,
-                **kwargs
+                **kwargs,
             )
 
             if batch_results:
@@ -200,24 +209,30 @@ def process_dataset(
     num_batches = math.ceil(len(dataset) / batch_size)
 
     # Process the dataset in batches
-    pbar = tqdm(range(num_batches), position=0, leave=True)
-
     batches = []
-    for i in pbar:
-        pbar.set_description(f"Processing Batch: {i}")
-        start_idx = i * batch_size
-        end_idx = min((i + 1) * batch_size, len(dataset))
+    with tqdm(total=num_batches, desc="Processing Batches", unit="batch", position=0, leave=False) as pbar:
+        for i in range(num_batches):
+            pbar.set_description(f"Processing Batch: {i}")
+            start_idx = i * batch_size
+            end_idx = min((i + 1) * batch_size, len(dataset))
 
-        # Process this batch
-        batch_results = dataset.select(range(start_idx, end_idx)).map(
-            lambda batch: process_batch(
-                batch, text_prompt, labels_dict, get_metadata_func, sub_batch_size, **kwargs
-            ),
-            batched=True,
-            batch_size=batch_size,
-        )
+            # Process this batch
+            batch_results = dataset.select(range(start_idx, end_idx)).map(
+                lambda batch: process_batch(
+                    batch,
+                    text_prompt,
+                    labels_dict,
+                    get_metadata_func,
+                    sub_batch_size,
+                    **kwargs,
+                ),
+                batched=True,
+                batch_size=batch_size,
+            )
 
-        batches.append(batch_results)
+            batches.append(batch_results)
+            
+            pbar.update(1)
 
     # Update the dataset with the new results
     return concatenate_datasets(batches)
@@ -232,7 +247,7 @@ def sanity_check(
     polygons = ds[row][metadata_col][mask_row]["polygons"]
     label = ds[row][metadata_col][mask_row]["label"]
     score = ds[row][metadata_col][mask_row]["score"]
-    
+
     try:
         image_url = ds[row]["image_url"]
         print(f"Image URL: {image_url}")
@@ -245,7 +260,7 @@ def sanity_check(
 
     print(f"Label: {label}")
     print(f"Score: {score}")
-    
+
     display(overlay.resize((512, 512)))
 
 
@@ -300,7 +315,6 @@ class CreateSegmentationDataset:
         self.box_threshold = box_threshold
         self.text_threshold = text_threshold
         self.iou_threshold = iou_threshold
-        
 
     def _load_yaml(self, path: str) -> Dict:
         """Load YAML configuration file."""
@@ -384,3 +398,10 @@ class CreateSegmentationDataset:
             image_col="image",
             metadata_col=self.metadata_col,
         )
+
+    def push_to_hub(self, repo_id, token, commit_message="md", private=True):
+        create_repo(repo_id=repo_id, repo_type="dataset", exist_ok=True,private=private, token=token)
+
+        self.processed_ds.push_to_hub(repo_id, commit_message=commit_message, token=token)
+
+        print(f"Pushed Dataset to Hub: {repo_id}")

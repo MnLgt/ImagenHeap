@@ -225,6 +225,7 @@ class SAMResults:
             "hat",
             "bag",
         ],
+        include_polygons=True, 
         **kwargs,
     ):
         self.image = image
@@ -241,7 +242,7 @@ class SAMResults:
             self.boxes,
             self.masks,
             self.labels_dict,
-            self.polygons,
+            self.polygons if include_polygons else [None] * len(self.masks),
             self.person_masks_only,
             overlap_thresh=overlap_thresh,
             labels_to_dedupe=labels_to_dedupe,
@@ -250,12 +251,12 @@ class SAMResults:
     def get_polygons(self):
         return [get_coco_style_polygons(mask) for mask in self.masks]
 
-    def display_results(self):
+    def display_results(self,**kwargs):
         if len(self.masks) < 4:
             cols = len(self.masks)
         else:
             cols = 4
-        return display_image_with_masks_and_boxes(self.image, self.formatted_results, cols=cols)
+        return display_image_with_masks_and_boxes(self.image, self.formatted_results, cols=cols, **kwargs)
 
     def get_mask(self, mask_label):
         assert mask_label in self.labels, "Mask label not found in results"
