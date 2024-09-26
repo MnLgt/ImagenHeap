@@ -43,6 +43,7 @@ datasets/*
 human_parsing/
 human_parsing_new/
 human_parsing_from_scratch/
+train_data/
 wandb/
 weights/
 logs/*

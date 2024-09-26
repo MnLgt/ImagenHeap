@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 from diffusers.utils import load_image
-from PIL import Image, ImageOps
+from PIL import Image, ImageOps, ImageDraw
 from torchvision.transforms import functional as F
 
 
@@ -183,6 +183,36 @@ def convert_coco_polygons_to_mask(polygons, height, width):
         cv2.fillPoly(mask, [pts], 255)
     # Convert to boolean
     return mask > 0
+
+
+def yolo_to_pil_mask(yolo_polygons, image_width, image_height):
+    """
+    Convert normalized YOLO coordinates to a PIL mask.
+
+    Args:
+        yolo_polygons (list): List of normalized YOLO coordinates.
+        image_width (int): Width of the original image.
+        image_height (int): Height of the original image.
+
+    Returns:
+        PIL.Image: Binary mask image.
+    """
+    # Convert YOLO coordinates back to pixel coordinates
+    pixel_coords = np.array(yolo_polygons).reshape(-1, 2)
+    pixel_coords[:, 0] *= image_width
+    pixel_coords[:, 1] *= image_height
+    pixel_coords = pixel_coords.flatten().tolist()
+
+    # Create a blank mask
+    mask = Image.new("L", (image_width, image_height), 0)
+
+    # Create a drawing context
+    draw = ImageDraw.Draw(mask)
+
+    # Draw the polygon on the mask
+    draw.polygon(pixel_coords, fill=255)
+
+    return mask
 
 
 def resize_preserve_aspect_ratio(image, max_side=512):
