@@ -169,3 +169,4 @@ yarl==1.9.4
 zipp==3.18.1
 GPUtil ## for gpu monitor
 blessed ## for gpu monitor
+loguru==0.7.2

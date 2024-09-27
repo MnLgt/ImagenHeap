@@ -2,9 +2,16 @@
 
 # Training Parameters
 epochs: 100
-batch: 16
-imgsz: 640
-workers: 8
+batch: 32
+imgsz: 1024
+workers: 32
+device: [0]
+
+# Performance Options
+amp: true
+fraction: 1.0 # portion of the dataset
+cache: false
+deterministic: true
 
 # Multi-scale training
 # Uncomment the following two lines to enable multi-scale training
@@ -35,12 +42,6 @@ close_mosaic: 10
 rect: false
 cos_lr: true
 
-# Performance Options
-amp: true
-fraction: 0.005 # set to 1.0
-cache: false
-deterministic: true
-
 # Regularization
 dropout: 0.0
 label_smoothing: 0.0  # Added based on available arguments
@@ -54,7 +55,7 @@ mask_ratio: 4
 # Saving and Logging
 save: true
 save_period: -1
-exist_ok: false
+exist_ok: true
 pretrained: true
 verbose: true
 plots: true

@@ -10,8 +10,15 @@ fi
 echo "Upgrading pip"
 pip install -U pip -qqq
 
-echo "Installing git lfs"
-git lfs install
+if ! command -v git-lfs &> /dev/null
+then
+    echo "git-lfs not found. Installing..."
+    sudo apt-get update && sudo apt-get install -y git-lfs
+    echo "Installing git lfs"
+    git lfs install
+else
+    echo "git-lfs is already installed"
+fi
 
 # echo "Cloning GroundingDINO repo"
 # git clone https://github.com/IDEA-Research/GroundingDINO.git
