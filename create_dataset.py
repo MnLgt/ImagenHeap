@@ -76,10 +76,10 @@ def load_all_in_sam(images, unformatted_results, labels_dict, **kwargs):
 
 
 def get_metadata(
-    text_prompt,
+    text_prompt: Union[str, List[str]],
     image_paths: List[str | Image.Image],
     labels_dict: Dict[str, int],
-    size: int = 1024,
+    image_size: int = 1024,
     **kwargs,
 ) -> List[Dict]:
     device = get_device()
@@ -87,7 +87,7 @@ def get_metadata(
     assert bool(image_paths), "No images provided"
 
     # Load and resize the images
-    images = [load_resize_image(im, size) for im in image_paths]
+    images = [load_resize_image(im, image_size) for im in image_paths]
 
     # Get the boxes from the prompts using DINO
     dino_results = DinoDetector(images, text_prompt, **kwargs)
@@ -174,7 +174,13 @@ def process_batch(
     image_paths = batch["image"]
     results = []
 
-    with tqdm(total=len(image_paths), desc="Processing Images", unit="img", leave=False, position=1) as pbar:
+    with tqdm(
+        total=len(image_paths),
+        desc="Processing Images",
+        unit="img",
+        leave=False,
+        position=1,
+    ) as pbar:
         for i in range(0, len(image_paths), batch_size):
             sub_batch = image_paths[i : i + batch_size]
             pbar.set_description(f"Sub Batch: {i // batch_size + 1}")
@@ -210,7 +216,13 @@ def process_dataset(
 
     # Process the dataset in batches
     batches = []
-    with tqdm(total=num_batches, desc="Processing Batches", unit="batch", position=0, leave=False) as pbar:
+    with tqdm(
+        total=num_batches,
+        desc="Processing Batches",
+        unit="batch",
+        position=0,
+        leave=False,
+    ) as pbar:
         for i in range(num_batches):
             pbar.set_description(f"Processing Batch: {i}")
             start_idx = i * batch_size
@@ -231,7 +243,7 @@ def process_dataset(
             )
 
             batches.append(batch_results)
-            
+
             pbar.update(1)
 
     # Update the dataset with the new results
@@ -264,68 +276,79 @@ def sanity_check(
     display(overlay.resize((512, 512)))
 
 
+import yaml
+from typing import Dict, Union, List
+from datasets import Dataset
+
+
 class CreateSegmentationDataset:
     """
     A class for creating and managing segmentation datasets based on text prompts.
 
     This class processes a given dataset to extract segmentation masks, bounding boxes,
-    and other metadata based on text prompts derived from a configuration file. It supports
-    efficient batch processing and provides methods for filtering results and performing
-    sanity checks.
+    and other metadata based on text prompts. It supports efficient batch processing
+    and provides methods for filtering results and performing sanity checks.
 
     Attributes:
         ds (Dataset): The input dataset to be processed.
         metadata_col (str): The name of the column where metadata will be stored.
-        config_path (str): Path to the configuration file (YAML format).
-        config (dict): Loaded configuration data.
-        labels_dict (dict): Dictionary mapping label names to their corresponding indices.
-        text_prompt (str): Text prompt generated from the labels for segmentation.
+        text_prompt (Union[str, List[str]]): Text prompt(s) for segmentation.
         bs (int): Batch size for processing.
         sub_bs (int): Sub-batch size for processing within each batch.
         processed_ds (Dataset): The processed dataset with added segmentation metadata.
 
     Args:
         ds (Dataset): The input dataset to be processed.
-        config_path (str): Path to the configuration file (YAML format).
+        text_prompt (Union[str, List[str]]): Text prompt(s) for segmentation.
         metadata_col (str, optional): Name of the column to store metadata. Defaults to 'metadata'.
-        bs (int, optional): Batch size for processing. Defaults to 100.
+        bs (int, optional): Batch size for processing. Defaults to 64.
         sub_bs (int, optional): Sub-batch size for processing. Defaults to 8.
+        box_threshold (float, optional): Threshold for box detection. Defaults to 0.3.
+        text_threshold (float, optional): Threshold for text detection. Defaults to 0.25.
+        iou_threshold (float, optional): Threshold for IOU. Defaults to 0.8.
     """
 
     def __init__(
         self,
         ds: Dataset,
-        config_path: str,
+        text_prompt: Union[str, List[str]],
         metadata_col: str = "metadata",
         bs: int = 64,
         sub_bs: int = 8,
-        box_threshold: int = 0.3,
-        text_threshold: int = 0.25,
-        iou_threshold: int = 0.8,
+        box_threshold: float = 0.3,
+        text_threshold: float = 0.25,
+        iou_threshold: float = 0.8,
     ):
         self.ds = ds
         self.metadata_col = metadata_col
-        self.config_path = config_path
-        self.config = self._load_yaml(config_path)
-        self.labels_dict = self._get_labels_dict(config_path)
-        self.text_prompt = self._get_text_prompt()
+        self.text_prompt = self._process_text_prompt(text_prompt)
         self.bs = bs
         self.sub_bs = sub_bs
         self.processed_ds = None
         self.box_threshold = box_threshold
         self.text_threshold = text_threshold
         self.iou_threshold = iou_threshold
+        self.labels_dict = self._get_labels_dict()
 
-    def _load_yaml(self, path: str) -> Dict:
-        """Load YAML configuration file."""
-        with open(path, "r") as file:
-            return yaml.safe_load(file)
+    def _process_text_prompt(self, text_prompt: Union[str, List[str]]) -> str:
+        """Process the text prompt."""
+        if isinstance(text_prompt, str):
+            return text_prompt
+        elif isinstance(text_prompt, list):
+            return ".".join(text_prompt)
+        else:
+            raise ValueError("text_prompt must be a string or a list of strings")
 
-    def _get_labels_dict(self, config_path: str) -> Dict[str, int]:
-        """Get labels dictionary from the config file."""
-        data = self._load_yaml(config_path)
-        labels_dict = data.get("names", {})
-        return {v: k for k, v in labels_dict.items()}
+    def _get_labels_dict(self) -> Dict[str, int]:
+        """Get labels dictionary from the text prompt."""
+        labels = self.text_prompt.split(" . ")
+        return {label: i for i, label in enumerate(labels)}
+
+    def create_yolo_config(self, save_path: str):
+        """Create and save the YOLO config YAML file."""
+        config = {"names": {i: label for label, i in self.labels_dict.items()}}
+        with open(save_path, "w") as file:
+            yaml.dump(config, file)
 
     def _get_text_prompt(self) -> str:
         """Generate text prompt from labels."""
@@ -400,8 +423,16 @@ class CreateSegmentationDataset:
         )
 
     def push_to_hub(self, repo_id, token, commit_message="md", private=True):
-        create_repo(repo_id=repo_id, repo_type="dataset", exist_ok=True,private=private, token=token)
+        create_repo(
+            repo_id=repo_id,
+            repo_type="dataset",
+            exist_ok=True,
+            private=private,
+            token=token,
+        )
 
-        self.processed_ds.push_to_hub(repo_id, commit_message=commit_message, token=token)
+        self.processed_ds.push_to_hub(
+            repo_id, commit_message=commit_message, token=token
+        )
 
         print(f"Pushed Dataset to Hub: {repo_id}")

@@ -22,6 +22,10 @@ def display_image_with_masks_and_boxes(
 
     # Number of results
     n = len(results)
+
+    # If there are fewer images than cols, set cols to n
+    cols = cols if cols <= n else n
+
     rows = (n + cols - 1) // cols  # Calculate required number of rows
 
     # Setting up the plot

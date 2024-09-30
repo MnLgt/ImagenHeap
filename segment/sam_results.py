@@ -6,7 +6,7 @@ from segment.visualizer import display_image_with_masks_and_boxes
 
 
 def format_scores(scores):
-    return scores.squeeze().cpu().numpy().tolist()
+    return [score.squeeze().cpu().numpy().tolist() for score in scores]
 
 
 def format_masks(masks):

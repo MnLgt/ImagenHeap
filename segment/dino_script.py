@@ -76,10 +76,12 @@ def text_prompt_handler(text_prompt: str, images: torch.Tensor) -> List[str]:
     num_images = images.size(0)  # Assuming the first dimension is the number of images
     return [processed_text_prompt] * num_images
 
+
 @lru_cache(maxsize=1)
 def get_text_prompt_split(text_prompt: str, splitter: str = ".") -> List[str]:
     return text_prompt.split(splitter)
-        
+
+
 def get_prompt_from_token(
     tokenized: PreTrainedTokenizerBase,
     text_prompt: str,
@@ -165,19 +167,26 @@ def load_dino_model(
     return model.to(device)
 
 
-dino_transform = T.Compose([
-    T.ToTensor(),
-    T.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
-])
+dino_transform = T.Compose(
+    [
+        T.ToTensor(),
+        T.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+    ]
+)
+
 
 def transform_image_dino(image_pil: Image.Image) -> torch.tensor:
     image, _ = dino_transform(image_pil, None)  # 3, h, w
     return image
 
+
 @lru_cache(maxsize=1)
-def tokenize_prompt(text_prompt: str, tokenizer: PreTrainedTokenizerBase) -> torch.tensor:
+def tokenize_prompt(
+    text_prompt: str, tokenizer: PreTrainedTokenizerBase
+) -> torch.tensor:
     return tokenizer(text_prompt, return_offsets_mapping=True)
-    
+
+
 def run_dino(
     dino_model: Callable,
     images: torch.tensor,
@@ -208,18 +217,22 @@ def run_dino(
     for logits, boxes, m in zip(prediction_logits, prediction_boxes, mask):
         filtered_logits = logits[m]
         filtered_boxes = boxes[m]
-        
+
         max_logits, max_indices = filtered_logits.max(dim=1)
         logit_mask = max_logits > text_threshold
 
         batch_result = {
-            'boxes': filtered_boxes[logit_mask],
-            'scores': max_logits[logit_mask],
-            'prompt_tokens': [
-                get_phrases_from_posmap(logit == max_val, tokenized, tokenizer).replace(".", "")
-                for logit, max_val in zip(filtered_logits[logit_mask], max_logits[logit_mask])
+            "boxes": filtered_boxes[logit_mask],
+            "scores": max_logits[logit_mask],
+            "prompt_tokens": [
+                get_phrases_from_posmap(logit == max_val, tokenized, tokenizer).replace(
+                    ".", ""
+                )
+                for logit, max_val in zip(
+                    filtered_logits[logit_mask], max_logits[logit_mask]
+                )
             ],
-            'text_prompts': [
+            "text_prompts": [
                 get_prompt_from_token(
                     tokenized,
                     text_prompt,
@@ -227,15 +240,15 @@ def run_dino(
                     splitter=".",
                 )
                 for max_idx in max_indices[logit_mask]
-            ]
+            ],
         }
         batch_results.append(batch_result)
 
     return (
-        [result['boxes'] for result in batch_results],
-        [result['scores'] for result in batch_results],
-        [result['prompt_tokens'] for result in batch_results],
-        [result['text_prompts'] for result in batch_results]
+        [result["boxes"] for result in batch_results],
+        [result["scores"] for result in batch_results],
+        [result["prompt_tokens"] for result in batch_results],
+        [result["text_prompts"] for result in batch_results],
     )
 
 
@@ -306,7 +319,7 @@ class DinoDetector:
         device (torch.device): The device on which computations will be performed.
         images (List[Image.Image]): List of PIL Image objects to be processed.
         dino_images (torch.Tensor): Tensor of transformed images ready for DINO model input.
-        text_prompt (str): A string of words to detect, separated by periods.
+        text_prompt (str | List[str]): The text prompt to be detected in the images.
         model: The loaded DINO model.
         box_threshold (float): Confidence threshold for bounding boxes (default: 0.3).
         text_threshold (float): Confidence threshold for text detection (default: 0.25).
@@ -317,7 +330,7 @@ class DinoDetector:
 
     Args:
         image (Union[str, Image.Image, List[Image.Image]]): Input image(s) as file path, PIL Image, or list of PIL Images.
-        text_prompt (str): A string of words to detect, separated by periods.
+        text_prompt (str | List[str]): Text prompt to be detected in the images.
         image_size (int, optional): Size to resize input images (default: 1024).
         box_threshold (float, optional): Confidence threshold for bounding boxes (default: 0.3).
         text_threshold (float, optional): Confidence threshold for text detection (default: 0.25).
@@ -336,7 +349,7 @@ class DinoDetector:
     def __init__(
         self,
         image: Union[str, Image.Image, List[Image.Image]],
-        text_prompt: str,
+        text_prompt: Union[str, List[str]],
         transform: Callable = transform_image_dino,
         image_size: int = 1024,
         box_threshold: float = 0.3,
@@ -348,7 +361,7 @@ class DinoDetector:
         self.images = image_handler(image, self.image_size)
         self.transform = transform
         self.dino_images = self.image_to_tensor()
-        self.text_prompt = text_prompt
+        self.text_prompt = self.prompt_formatter(text_prompt)
         self.processed_text_prompt = self._process_text_prompts(self.text_prompt)
         self.model = self._load_dino_model()
         self.box_threshold = box_threshold
@@ -370,6 +383,15 @@ class DinoDetector:
     def _process_text_prompts(self, text_prompt: str) -> List[str]:
         return text_prompt_handler(text_prompt, self.dino_images)
 
+    def prompt_formatter(self, text_prompt):
+        if isinstance(text_prompt, str):
+            return text_prompt
+
+        elif isinstance(self.text_prompt, list):
+            return ".".join(self.text_prompt)
+        else:
+            raise ValueError("text_prompt must be a string or a list of strings.")
+
     def run(self):
         self.boxes, self.scores, self.prompt_tokens, self.pred_prompt = run_dino(
             self.model,
@@ -379,15 +401,13 @@ class DinoDetector:
             self.text_threshold,
         )
 
-        self.boxes, self.scores, self.prompt_tokens, self.pred_prompt = (
-            format_dino(
-                self.boxes,
-                self.scores,
-                self.prompt_tokens,
-                self.pred_prompt,
-                (self.image_size, self.image_size),
-                self.iou_threshold,
-            )
+        self.boxes, self.scores, self.prompt_tokens, self.pred_prompt = format_dino(
+            self.boxes,
+            self.scores,
+            self.prompt_tokens,
+            self.pred_prompt,
+            (self.image_size, self.image_size),
+            self.iou_threshold,
         )
 
     def asdict(self, image_num=0):
@@ -413,5 +433,8 @@ class DinoDetector:
     ):
         # Convert PIL Image to numpy array
         display_image_with_masks_and_boxes(
-            self.images[image_num], self.asdict(image_num=image_num), cols=cols, **kwargs
+            self.images[image_num],
+            self.asdict(image_num=image_num),
+            cols=cols,
+            **kwargs,
         )
