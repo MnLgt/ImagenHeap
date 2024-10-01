@@ -32,6 +32,7 @@ from segment.utils import get_device, image_handler, load_resize_image
 from segment.visualizer import display_image_with_masks_and_boxes
 from typing import Union
 from transformers import PreTrainedTokenizerBase
+from segment.components.inputs import ImageInput
 
 DEVICE = get_device()
 
@@ -348,7 +349,7 @@ class DinoDetector:
 
     def __init__(
         self,
-        image: Union[str, Image.Image, List[Image.Image]],
+        image: ImageInput,
         text_prompt: Union[str, List[str]],
         transform: Callable = transform_image_dino,
         image_size: int = 1024,

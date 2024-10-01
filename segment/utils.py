@@ -1,14 +1,58 @@
+import os
 import time
-from typing import List
+from typing import List, Union, Callable
 
 import cv2
 import matplotlib.patches as patches
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
-from diffusers.utils import load_image
 from PIL import Image, ImageOps, ImageDraw
 from torchvision.transforms import functional as F
+
+
+def load_image(
+    image: Union[str, Image.Image],
+    convert_method: Callable[[Image.Image], Image.Image] = None,
+) -> Image.Image:
+    """
+    Loads `image` to a PIL Image.
+
+    Args:
+        image (`str` or `Image.Image`):
+            The image to convert to the PIL Image format.
+        convert_method (Callable[[Image.Image], Image.Image], optional):
+            A conversion method to apply to the image after loading it.
+            When set to `None` the image will be converted "RGB".
+
+    Returns:
+        `Image.Image`:
+            A PIL Image.
+    """
+    if isinstance(image, str):
+        if image.startswith("http://") or image.startswith("https://"):
+            image = Image.open(requests.get(image, stream=True).raw)
+        elif os.path.isfile(image):
+            image = Image.open(image)
+        else:
+            raise ValueError(
+                f"Incorrect path or URL. URLs must start with `http://` or `https://`, and {image} is not a valid path."
+            )
+    elif isinstance(image, Image.Image):
+        image = image
+    else:
+        raise ValueError(
+            "Incorrect format used for the image. Should be a URL linking to an image, a local path, or a PIL image."
+        )
+
+    image = ImageOps.exif_transpose(image)
+
+    if convert_method is not None:
+        image = convert_method(image)
+    else:
+        image = image.convert("RGB")
+
+    return image
 
 
 def time_decorator(func):

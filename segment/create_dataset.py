@@ -8,35 +8,28 @@ import warnings
 warnings.filterwarnings(action="ignore", category=UserWarning)
 warnings.filterwarnings(action="ignore", category=FutureWarning)
 
-import os
-from typing import List, Dict, Any, Callable
-from pathlib import Path
-from PIL import Image
-from segment.utils import resize_image_pil
-from segment.dino_script import DinoDetector
-from segment.sam_script import get_sam_results
-from segment.utils import get_device
-from segment.sam_results import SAMResults
-from diffusers.utils import load_image
-from segment.sam_script import get_sam_results
-from segment.utils import get_coco_style_polygons
-import yaml
-from datasets import load_dataset, Dataset
-from typing import List, Dict
-from datasets import Dataset, concatenate_datasets
-from typing import List, Dict
-from PIL import Image
 import math
-from tqdm.auto import tqdm
-from segment.utils import *
-import pandas as pd
+import os
 import random
-from huggingface_hub import create_repo
-from IPython.display import display
 from functools import lru_cache
+from typing import Any, Callable, Dict, List, Union
+
+import yaml
+from datasets import Dataset, concatenate_datasets
 
 # disable datasets.map progress bar
 from datasets.utils.logging import disable_progress_bar
+from diffusers.utils import load_image
+from huggingface_hub import create_repo
+from IPython.display import display
+from PIL import Image
+from tqdm.auto import tqdm
+
+from segment.dino_script import DinoDetector
+from segment.sam_results import SAMResults
+from segment.sam_script import get_sam_results
+from segment.utils import *
+from segment.utils import get_device, resize_image_pil
 
 disable_progress_bar()
 
@@ -274,11 +267,6 @@ def sanity_check(
     print(f"Score: {score}")
 
     display(overlay.resize((512, 512)))
-
-
-import yaml
-from typing import Dict, Union, List
-from datasets import Dataset
 
 
 class CreateSegmentationDataset:
