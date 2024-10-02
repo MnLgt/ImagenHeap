@@ -91,7 +91,7 @@ def get_metadata(
     phrases = dino_results.pred_prompt
 
     unformatted_results = get_sam_results(
-        images, boxes=boxes, phrases=phrases, **kwargs
+        images, boxes=boxes, phrases=phrases, image_size=image_size, **kwargs
     )
 
     return load_all_in_sam(images, unformatted_results, labels_dict, **kwargs)
@@ -306,6 +306,8 @@ class CreateSegmentationDataset:
         box_threshold: float = 0.3,
         text_threshold: float = 0.25,
         iou_threshold: float = 0.8,
+        image_size=1024,
+        **kwargs,
     ):
         self.ds = ds
         self.metadata_col = metadata_col
@@ -317,6 +319,7 @@ class CreateSegmentationDataset:
         self.text_threshold = text_threshold
         self.iou_threshold = iou_threshold
         self.labels_dict = self._get_labels_dict()
+        self.kwargs = kwargs
 
     def _process_text_prompt(self, text_prompt: Union[str, List[str]]) -> str:
         """Process the text prompt."""
@@ -329,19 +332,8 @@ class CreateSegmentationDataset:
 
     def _get_labels_dict(self) -> Dict[str, int]:
         """Get labels dictionary from the text prompt."""
-        labels = self.text_prompt.split(" . ")
+        labels = self.text_prompt.split(".")
         return {label: i for i, label in enumerate(labels)}
-
-    def create_yolo_config(self, save_path: str):
-        """Create and save the YOLO config YAML file."""
-        config = {"names": {i: label for label, i in self.labels_dict.items()}}
-        with open(save_path, "w") as file:
-            yaml.dump(config, file)
-
-    def _get_text_prompt(self) -> str:
-        """Generate text prompt from labels."""
-        labels = list(self.labels_dict.keys())
-        return " . ".join(labels)
 
     def process(self):
         """
@@ -360,6 +352,7 @@ class CreateSegmentationDataset:
             box_threshold=self.box_threshold,
             text_threshold=self.text_threshold,
             iou_threshold=self.iou_threshold,
+            **self.kwargs,
         )
 
     def filter_scores(self, score_cutoff: float):
@@ -398,9 +391,12 @@ class CreateSegmentationDataset:
             row = random.randint(0, len(self.processed_ds) - 1)
 
         if mask_row is None:
-            mask_row = random.randint(
-                0, len(self.processed_ds[row][self.metadata_col]) - 1
-            )
+            if self.processed_ds[row][self.metadata_col]:
+                mask_row = random.randint(
+                    0, len(self.processed_ds[row][self.metadata_col]) - 1
+                )
+            else:
+                raise ValueError("No masks found in the selected row")
 
         sanity_check(
             self.processed_ds,

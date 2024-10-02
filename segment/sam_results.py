@@ -2,7 +2,13 @@ import numpy as np
 from PIL import ImageDraw
 
 from segment.utils import get_coco_style_polygons, unload_box, unload_mask
-from segment.visualizer import display_image_with_masks_and_boxes
+from segment.visualizer import visualizer
+from itertools import groupby
+from operator import itemgetter
+
+# determine whether two masks overlap
+import numpy as np
+from PIL import Image
 
 
 def format_scores(scores):
@@ -15,14 +21,6 @@ def format_masks(masks):
 
 def format_boxes(boxes):
     return [unload_box(box) for box in boxes]
-
-
-from itertools import groupby
-from operator import itemgetter
-
-# determine whether two masks overlap
-import numpy as np
-from PIL import Image
 
 
 def compute_mask_overlap(mask1, mask2):
@@ -225,7 +223,7 @@ class SAMResults:
             "hat",
             "bag",
         ],
-        include_polygons=True, 
+        include_polygons=True,
         **kwargs,
     ):
         self.image = image
@@ -251,12 +249,12 @@ class SAMResults:
     def get_polygons(self):
         return [get_coco_style_polygons(mask) for mask in self.masks]
 
-    def display_results(self,**kwargs):
+    def display_results(self, **kwargs):
         if len(self.masks) < 4:
             cols = len(self.masks)
         else:
             cols = 4
-        return display_image_with_masks_and_boxes(self.image, self.formatted_results, cols=cols, **kwargs)
+        return visualizer(self.image, self.formatted_results, cols=cols, **kwargs)
 
     def get_mask(self, mask_label):
         assert mask_label in self.labels, "Mask label not found in results"

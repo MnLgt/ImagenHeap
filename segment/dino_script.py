@@ -29,7 +29,7 @@ from PIL import Image
 
 from segment.sam_results import format_boxes, format_scores
 from segment.utils import get_device, image_handler, load_resize_image
-from segment.visualizer import display_image_with_masks_and_boxes
+from segment.visualizer import visualizer
 from typing import Union
 from transformers import PreTrainedTokenizerBase
 from segment.components.inputs import ImageInput
@@ -253,12 +253,57 @@ def run_dino(
     )
 
 
+import torch
+import torchvision
+from segment.utilities.box_rescaler import BoxRescaler, BoxFormat, CoordinateSystem
+
+# def rescale_boxes(boxes, original_size, max_image_side=1024):
+#     original_w, original_h = original_size
+
+#     # Calculate the scaling factor and padding
+#     scale = max(original_w, original_h) / max_image_side
+#     new_w = int(original_w / scale)
+#     new_h = int(original_h / scale)
+#     pad_w = (max_image_side - new_w) / 2
+#     pad_h = (max_image_side - new_h) / 2
+
+#     rescaled_boxes = []
+#     for box in boxes:
+#         # Denormalize
+#         x, y, w, h = box * max_image_side
+
+#         # Remove padding
+#         x = max(0, x - pad_w)
+#         y = max(0, y - pad_h)
+
+#         # Adjust for original image size
+#         x *= scale
+#         y *= scale
+#         w *= scale
+#         h *= scale
+
+#         # Convert to corner format
+#         x1, y1 = x - w / 2, y - h / 2
+#         x2, y2 = x + w / 2, y + h / 2
+
+#         # Clip to image boundaries
+#         x1 = max(0, min(x1, original_w))
+#         y1 = max(0, min(y1, original_h))
+#         x2 = max(0, min(x2, original_w))
+#         y2 = max(0, min(y2, original_h))
+
+#         rescaled_boxes.append(torch.tensor([x1, y1, x2, y2]))
+
+#     return torch.stack(rescaled_boxes)
+
+
 def format_dino(
     batch_boxes_filt,
     batch_scores,
     batch_pred_prompt_tokens,
     batch_pred_text_prompts,
-    image_size=(1024, 1024),
+    image_sizes,
+    max_image_side=1024,
     iou_threshold=0.8,
 ):
     batch_final_boxes = []
@@ -266,24 +311,24 @@ def format_dino(
     batch_final_prompt_tokens = []
     batch_final_text_prompt = []
 
-    # Process each item in the batch
-    for (
-        boxes_filt,
-        scores,
-        pred_prompt_tokens,
-        pred_prompt,
-    ) in zip(
+    for boxes_filt, scores, pred_prompt_tokens, pred_prompt, original_size in zip(
         batch_boxes_filt,
         batch_scores,
         batch_pred_prompt_tokens,
         batch_pred_text_prompts,
+        image_sizes,
     ):
-        # Adjust box coordinates based on image size
-        H, W = image_size[1], image_size[0]
-        for i in range(boxes_filt.size(0)):
-            boxes_filt[i] = boxes_filt[i] * torch.Tensor([W, H, W, H])
-            boxes_filt[i][:2] -= boxes_filt[i][2:] / 2
-            boxes_filt[i][2:] += boxes_filt[i][:2]
+        # Rescale boxes
+        # boxes_filt = rescale_boxes(boxes_filt, original_size, max_image_side)
+        rescaler = BoxRescaler(original_size, max_image_side)
+
+        boxes_filt = rescaler.rescale(
+            boxes_filt,
+            from_format=BoxFormat.XYWH,
+            to_format=BoxFormat.XYXY,
+            from_system=CoordinateSystem.NORMALIZED,
+            to_system=CoordinateSystem.ABSOLUTE,
+        )
 
         # Non-maximum suppression (NMS)
         nms_idx = (
@@ -294,7 +339,6 @@ def format_dino(
         final_prompt_tokens = [pred_prompt_tokens[idx] for idx in nms_idx]
         final_text_prompt = [pred_prompt[idx] for idx in nms_idx]
 
-        # Collect results for this batch element
         batch_final_boxes.append(final_boxes)
         batch_final_scores.append(final_scores)
         batch_final_prompt_tokens.append(final_prompt_tokens)
@@ -316,7 +360,7 @@ class DinoDetector:
     and display the results.
 
     Attributes:
-        image_size (int): The size to which input images will be resized (default: 1024).
+        image_size (tuple): The size to which input images will be resized (default: (1024,1024)).
         device (torch.device): The device on which computations will be performed.
         images (List[Image.Image]): List of PIL Image objects to be processed.
         dino_images (torch.Tensor): Tensor of transformed images ready for DINO model input.
@@ -332,7 +376,7 @@ class DinoDetector:
     Args:
         image (Union[str, Image.Image, List[Image.Image]]): Input image(s) as file path, PIL Image, or list of PIL Images.
         text_prompt (str | List[str]): Text prompt to be detected in the images.
-        image_size (int, optional): Size to resize input images (default: 1024).
+        image_size (tuple, optional): Size to resize input images (default: (1024, 1024)).
         box_threshold (float, optional): Confidence threshold for bounding boxes (default: 0.3).
         text_threshold (float, optional): Confidence threshold for text detection (default: 0.25).
         iou_threshold (float, optional): Intersection over Union threshold for box merging (default: 0.8).
@@ -352,14 +396,15 @@ class DinoDetector:
         image: ImageInput,
         text_prompt: Union[str, List[str]],
         transform: Callable = transform_image_dino,
-        image_size: int = 1024,
+        max_image_side: int = 1024,
         box_threshold: float = 0.3,
         text_threshold: float = 0.25,
         iou_threshold: float = 0.8,
     ):
-        self.image_size = image_size
+        self.max_image_side = max_image_side
         self.device = DEVICE
-        self.images = image_handler(image, self.image_size)
+        self.images = image_handler(image)
+        self.image_sizes = [image.size for image in self.images]
         self.transform = transform
         self.dino_images = self.image_to_tensor()
         self.text_prompt = self.prompt_formatter(text_prompt)
@@ -378,7 +423,11 @@ class DinoDetector:
 
     def image_to_tensor(self):
         with torch.no_grad():
-            dino_images = torch.stack([self.transform(image) for image in self.images])
+            # resize the images to the same size
+            images = [
+                load_resize_image(image, self.max_image_side) for image in self.images
+            ]
+            dino_images = torch.stack([self.transform(image) for image in images])
         return dino_images.to(self.device)
 
     def _process_text_prompts(self, text_prompt: str) -> List[str]:
@@ -388,8 +437,8 @@ class DinoDetector:
         if isinstance(text_prompt, str):
             return text_prompt
 
-        elif isinstance(self.text_prompt, list):
-            return ".".join(self.text_prompt)
+        elif isinstance(text_prompt, list):
+            return ".".join(text_prompt)
         else:
             raise ValueError("text_prompt must be a string or a list of strings.")
 
@@ -407,7 +456,8 @@ class DinoDetector:
             self.scores,
             self.prompt_tokens,
             self.pred_prompt,
-            (self.image_size, self.image_size),
+            self.image_sizes,
+            self.max_image_side,
             self.iou_threshold,
         )
 
@@ -433,7 +483,7 @@ class DinoDetector:
         **kwargs,
     ):
         # Convert PIL Image to numpy array
-        display_image_with_masks_and_boxes(
+        visualizer(
             self.images[image_num],
             self.asdict(image_num=image_num),
             cols=cols,

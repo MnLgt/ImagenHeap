@@ -9,6 +9,7 @@ import numpy as np
 import torch
 from PIL import Image, ImageOps, ImageDraw
 from torchvision.transforms import functional as F
+import requests
 
 
 def load_image(
@@ -147,19 +148,19 @@ def display_image_with_masks(image, results, cols=4):
     plt.show()
 
 
-def unload_mask(mask):
-    mask = mask.cpu().numpy().squeeze()
-    mask = mask.astype(np.uint8) * 255
-    return Image.fromarray(mask)
-
-
 # def unload_mask(mask):
-#     # permute the mask to the right order
-#     mask = mask.permute(1, 2, 0)
-
 #     mask = mask.cpu().numpy().squeeze()
 #     mask = mask.astype(np.uint8) * 255
-#     return Image.fromarray(mask).convert("L")
+#     return Image.fromarray(mask)
+
+
+def unload_mask(mask):
+    # permute the mask to the right order
+    mask = mask.permute(1, 2, 0)
+
+    mask = mask.cpu().numpy().squeeze()
+    mask = mask.astype(np.uint8) * 255
+    return Image.fromarray(mask).convert("L")
 
 
 def unload_box(box):
@@ -359,9 +360,25 @@ def image_handler(image: str | Image.Image | List[Image.Image], size: int = 1024
         image = load_resize_image(image, size)
         return [image]
     elif isinstance(image, Image.Image):
-        image = resize_image_pil(image, size)
+        image = load_resize_image(image, size)
         return [image]
     elif isinstance(image, list):
         return [load_resize_image(img, size) for img in image]
     else:
         raise ValueError("Image must be a string, PIL Image, or list of PIL Images.")
+
+
+# def image_handler(image: str | Image.Image | List[Image.Image], size: int = 1024):
+#     """
+#     Takes an image path, a PIL image or a list of PIL images and returns a list of PIL images resized to 1024x1024.
+#     """
+#     if isinstance(image, str):
+#         image = load_image(image)
+#         return [image]
+#     elif isinstance(image, Image.Image):
+#         image = load_image(image)
+#         return [image]
+#     elif isinstance(image, list):
+#         return [load_image(img) for img in image]
+#     else:
+#         raise ValueError("Image must be a string, PIL Image, or list of PIL Images.")

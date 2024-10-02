@@ -1,14 +1,16 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
+from segment.utils import convert_coco_polygons_to_mask
+from PIL import Image
 
 
-def display_image_with_masks_and_boxes(
+def visualizer(
     image,
     results,
     box_label="box",
     mask_label="mask",
-    prompt_label="prompt",
+    prompt_label="label",
     score_label="score",
     cols=4,
     **kwargs,
@@ -46,6 +48,11 @@ def display_image_with_masks_and_boxes(
 
         # Create a copy of the original image
         combined = image_np.copy()
+        if mask_label not in result and "polygons" in result:
+            polygons = result["polygons"]
+            mask = convert_coco_polygons_to_mask(polygons, 1024, 1024)
+            mask_image = Image.fromarray(mask)
+            result["mask"] = mask_image
 
         # Draw mask if present
         if mask_label in result:
