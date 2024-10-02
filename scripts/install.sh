@@ -20,8 +20,8 @@ else
     echo "git-lfs is already installed"
 fi
 
-# echo "Cloning GroundingDINO repo"
-# git clone https://github.com/IDEA-Research/GroundingDINO.git
+echo "Cloning GroundingDINO repo"
+git clone https://github.com/IDEA-Research/GroundingDINO.git
 
 # Install segment-anything 
 echo "Installing segment-anything"
@@ -40,21 +40,21 @@ pip install --upgrade diffusers[torch] -qqq
 echo "Installing other dependencies"
 pip install opencv-python pycocotools matplotlib onnxruntime onnx ipykernel -qqq
 
-# echo "Downloading weights"
-# # check if weights dir exists
-# if [ ! -d "weights" ]; then
-#     mkdir weights
-# fi
+echo "Downloading weights"
+# check if weights dir exists
+if [ ! -d "weights" ]; then
+    mkdir weights
+fi
 
-# # check if groundingdino weights exists
-# if [ ! -f "weights/groundingdino_swint_ogc.pth" ]; then
-#     wget https://huggingface.co/ShilongLiu/GroundingDINO/resolve/main/groundingdino_swint_ogc.pth -O weights/groundingdino_swint_ogc.pth
-# fi
+# check if groundingdino weights exists
+if [ ! -f "weights/groundingdino_swint_ogc.pth" ]; then
+    wget https://huggingface.co/ShilongLiu/GroundingDINO/resolve/main/groundingdino_swint_ogc.pth -O weights/groundingdino_swint_ogc.pth
+fi
 
-# # check if sam_vit_h_4b8939.pth exists
-# if [ ! -f "weights/sam_vit_h_4b8939.pth" ]; then
-#     wget https://huggingface.co/spaces/mrtlive/segment-anything-model/resolve/main/sam_vit_h_4b8939.pth -O weights/sam_vit_h_4b8939.pth
-# fi
+# check if sam_vit_h_4b8939.pth exists
+if [ ! -f "weights/sam_vit_h_4b8939.pth" ]; then
+    wget https://huggingface.co/spaces/mrtlive/segment-anything-model/resolve/main/sam_vit_h_4b8939.pth -O weights/sam_vit_h_4b8939.pth
+fi
 
 echo "Registering Venv"
 pip install ipykernel ipywidgets -qqq

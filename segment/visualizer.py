@@ -10,7 +10,7 @@ def visualizer(
     results,
     box_label="box",
     mask_label="mask",
-    prompt_label="label",
+    prompt_label="phrase",
     score_label="score",
     cols=4,
     **kwargs,
@@ -52,7 +52,7 @@ def visualizer(
             polygons = result["polygons"]
             mask = convert_coco_polygons_to_mask(polygons, 1024, 1024)
             mask_image = Image.fromarray(mask)
-            result["mask"] = mask_image
+            result[mask_label] = mask_image
 
         # Draw mask if present
         if mask_label in result:

@@ -27,7 +27,7 @@ from GroundingDINO.groundingdino.util.utils import (
 )
 from PIL import Image
 
-from segment.sam_results import format_boxes, format_scores
+from SEGMENT.archive.segment.sam_results import format_boxes, format_scores
 from segment.utils import get_device, image_handler, load_resize_image
 from segment.visualizer import visualizer
 from typing import Union

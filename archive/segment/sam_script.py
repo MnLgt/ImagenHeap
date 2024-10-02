@@ -19,7 +19,7 @@ from PIL import Image
 from segment_anything import build_sam
 from segment_anything.utils.transforms import ResizeLongestSide
 
-from segment.dino_script import DinoDetector
+from SEGMENT.archive.segment.dino_script import DinoDetector
 from segment.utils import get_device, load_resize_image
 
 DEVICE = get_device()
