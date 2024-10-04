@@ -71,7 +71,7 @@ class ComponentManager:
         total_items = len(next(iter(data.values())))
         batch_results = []
 
-        desc = f"Using {component.name.title()}"
+        desc = f"Running {component.name.title()}"
         with tqdm(total=total_items, position=1, leave=True, desc=desc) as batch_pbar:
             for batch in batches:
                 if component_kwargs:
@@ -95,7 +95,7 @@ class ComponentManager:
         data = initial_data
         num_components = len(self.pipeline)
 
-        with tqdm(total=num_components, desc="Overall Progress") as pbar:
+        with tqdm(total=num_components, desc="Progress") as pbar:
             for component_name in self.pipeline:
                 component = self.get_component(component_name)
                 component_config = component_kwargs.get(component_name, {})

@@ -2,6 +2,10 @@ from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Union
 from PIL import Image
 import torch
+from torch.cuda import empty_cache
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class Component(ABC):
@@ -29,11 +33,13 @@ class Component(ABC):
         pass
 
     def unload_model(self):
-        assert self.model is not None, "No model to unload"
-
-        del self.model
-        if self.device == "cuda":
-            torch.cuda.empty_cache()
+        if self.model is not None:
+            del self.model
+            self.model = None
+            empty_cache()
+            logger.info("Model unloaded and CUDA cache cleared")
+        else:
+            logger.info("No model to unload")
 
     def configure(self, config: Dict[str, Any]) -> None:
         """

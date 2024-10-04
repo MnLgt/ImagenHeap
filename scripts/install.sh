@@ -30,8 +30,8 @@ else
     echo "git-lfs is already installed"
 fi
 
-echo "Cloning GroundingDINO repo"
-git clone https://github.com/IDEA-Research/GroundingDINO.git
+echo "Installing GroundingDINO"
+pip install git+https://github.com/IDEA-Research/GroundingDINO.git -qqq
 
 # Install segment-anything 
 echo "Installing segment-anything"

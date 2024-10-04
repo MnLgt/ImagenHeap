@@ -1,26 +1,28 @@
 import os
-import sys
-from typing import Any, Dict, List, Union
-
-sys.path.append("../../..")
+from typing import Any, Dict, List
 from functools import lru_cache
-from typing import List, Tuple, Union, Callable
+from typing import List, Tuple
 
 import torch
 import torchvision
 from PIL import Image
-from GroundingDINO.groundingdino.models import build_model
-from GroundingDINO.groundingdino.util.slconfig import SLConfig
-from GroundingDINO.groundingdino.util.utils import (
+from groundingdino.models import build_model
+from groundingdino.util.slconfig import SLConfig
+from groundingdino.util.utils import (
     clean_state_dict,
     get_phrases_from_posmap,
 )
-import GroundingDINO.groundingdino.datasets.transforms as T
+import groundingdino.datasets.transforms as T
+from groundingdino.config import GroundingDINO_SwinT_OGC
+
 
 from segment.utilities.box_rescaler import BoxRescaler, BoxFormat, CoordinateSystem
-from segment.components.inputs import ImageInput
 from segment.utils import get_device
 from segment.components.base import Component
+from segment.utils import load_resize_image, load_image
+import logging
+
+logger = logging.getLogger(__name__)
 
 # jupyter
 CURDIR = os.path.dirname(__file__)
@@ -28,10 +30,8 @@ CURDIR = os.path.dirname(__file__)
 WEIGHTS_DIR = os.path.join(CURDIR, "..", "..", "..", "weights")
 
 # Dino
-DINO_DIR = os.path.join(CURDIR, "..", "..", "..", "GroundingDINO")
-assert os.path.exists(DINO_DIR), "GroundingDINO not found"
 DINO_CHECKPOINT = os.path.join(WEIGHTS_DIR, "groundingdino_swint_ogc.pth")
-DINO_CONFIG = os.path.join(DINO_DIR, "groundingdino/config/GroundingDINO_SwinT_OGC.py")
+DINO_CONFIG = GroundingDINO_SwinT_OGC.__file__
 
 
 class DetectDino(Component):
@@ -46,23 +46,26 @@ class DetectDino(Component):
         self.tokens = []
         self.phrases = []
 
-    @lru_cache(maxsize=1)
     def load_model(self):
-        config_path = DINO_CONFIG
-        checkpoint_path = DINO_CHECKPOINT
+        if self.model is None:
+            checkpoint_path = DINO_CHECKPOINT
 
-        args = SLConfig.fromfile(config_path)
-        args.device = self.device
+            args = SLConfig.fromfile(DINO_CONFIG)
+            args.device = self.device
 
-        model = build_model(args)
-        checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=True)
-        load_result = model.load_state_dict(
-            clean_state_dict(checkpoint["model"]), strict=False
-        )
-        print(f"Model loading result: {load_result}")
+            model = build_model(args)
+            checkpoint = torch.load(
+                checkpoint_path, map_location="cpu", weights_only=True
+            )
+            load_result = model.load_state_dict(
+                clean_state_dict(checkpoint["model"]), strict=False
+            )
+            logger.info(f"Model loading result: {load_result}")
 
-        model.eval()
-        self.model = model.to(self.device)
+            model.eval()
+            self.model = model.to(self.device)
+        else:
+            logger.info("Model already loaded")
 
     def _get_transform(self):
         return T.Compose(
@@ -190,14 +193,21 @@ class DetectDino(Component):
         if isinstance(text_prompt, list):
             text_prompt = ".".join(text_prompt)
 
-        pil_images = [
-            Image.open(img) if isinstance(img, str) else img for img in images
-        ]
+        # If using without SAM then we can load the images without resizing
+        # However since this is primarily being used in conjunction with SAM we will resize all images
+        # If we just want to use Dino by itself we load the images at normal size, get the sizes, and then resize them
+        # The format method will adjust the boxes back to the original image size coordinates
+
+        pil_images = [load_image(image) for image in images]
+
+        # Get the original image sizes
         image_sizes = [image.size for image in pil_images]
 
+        # Resize images to the maximum side
         resized_images = [
-            self._resize_image(image, max_image_side) for image in pil_images
+            load_resize_image(image, max_image_side) for image in pil_images
         ]
+
         dino_images = torch.stack(
             [self._transform_image(image) for image in resized_images]
         ).to(self.device)
@@ -250,20 +260,29 @@ class DetectDino(Component):
         ):
             rescaler = BoxRescaler(original_size, max_image_side)
 
-            boxes = rescaler.rescale(
-                boxes,
-                from_format=BoxFormat.XYWH,
-                to_format=BoxFormat.XYXY,
-                from_system=CoordinateSystem.NORMALIZED,
-                to_system=CoordinateSystem.ABSOLUTE,
-            )
+            if len(boxes) > 0:
+                boxes = rescaler.rescale(
+                    boxes,
+                    from_format=BoxFormat.XYWH,
+                    to_format=BoxFormat.XYXY,
+                    from_system=CoordinateSystem.NORMALIZED,
+                    to_system=CoordinateSystem.ABSOLUTE,
+                )
 
-            nms_idx = torchvision.ops.nms(boxes, scores, iou_threshold).numpy().tolist()
+                nms_idx = (
+                    torchvision.ops.nms(boxes, scores, iou_threshold).numpy().tolist()
+                )
 
-            boxes = boxes[nms_idx]
-            scores = scores[nms_idx]
-            tokens = [prompt_tokens[idx] for idx in nms_idx]
-            phrases = [pred_prompts[idx] for idx in nms_idx]
+                boxes = boxes[nms_idx]
+                scores = scores[nms_idx]
+                tokens = [prompt_tokens[idx] for idx in nms_idx]
+                phrases = [pred_prompts[idx] for idx in nms_idx]
+            else:
+                # Create empty tensors/lists for images with no detections
+                boxes = torch.empty((0, 4), dtype=torch.float32)
+                scores = torch.empty(0, dtype=torch.float32)
+                tokens = []
+                phrases = []
 
             self.boxes.append(boxes)
             self.scores.append(scores)

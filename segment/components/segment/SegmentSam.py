@@ -11,7 +11,9 @@ from segment_anything.utils.transforms import ResizeLongestSide
 from segment.utils import get_device
 from segment.utils import load_resize_image
 from segment.components.base import Component
+import logging 
 
+logger = logging.getLogger(__name__)
 
 DEVICE = get_device()
 
@@ -37,11 +39,14 @@ class SegmentSam(Component):
         self.model = None
         self.transform = ResizeLongestSide(1024)
 
-    @lru_cache(maxsize=1)
     def load_model(self):
-        sam_checkpoint = os.path.join(self.weights_dir, "sam_vit_h_4b8939.pth")
-        sam = build_sam(checkpoint=sam_checkpoint)
-        self.model = sam.to(device=self.device)
+        if self.model is None:
+            sam_checkpoint = os.path.join(self.weights_dir, "sam_vit_h_4b8939.pth")
+            sam = build_sam(checkpoint=sam_checkpoint)
+            self.model = sam.to(device=self.device)
+            logger.info("SAM Model loaded")
+        else:
+            logger.info("Model already loaded")
 
     def transform_image(self, image: Image.Image) -> torch.Tensor:
         if isinstance(image, Image.Image):
@@ -95,9 +100,9 @@ class SegmentSam(Component):
         valid_mask = torch.tensor([box.numel() > 0 for box in boxes], dtype=torch.bool)
 
         # Initialize output lists
-        output_masks = [None] * batch_size
-        output_boxes = [None] * batch_size
-        output_scores = [None] * batch_size
+        output_masks = [torch.tensor([])] * batch_size
+        output_boxes = [torch.tensor([])] * batch_size
+        output_scores = [torch.tensor([])] * batch_size
         output_phrases = [None] * batch_size
 
         if valid_mask.any():

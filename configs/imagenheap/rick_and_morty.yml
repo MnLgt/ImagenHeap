@@ -1,0 +1,30 @@
+components:
+  - name: DetectDino
+  - name: SegmentSam
+
+pipeline:
+  - detect
+  - segment
+
+dataset:
+  path: qwertyaditya/rick_and_morty_text_to_image
+
+batch_size: 10
+
+component_args:
+  detect:
+    text_prompt:
+      - hair
+      - face
+      - neck
+      - arm
+      - hand
+      - back
+      - leg
+      - foot
+      - outfit
+      - phone
+      - hat
+      - shoe
+  segment:
+    return_tensors: true

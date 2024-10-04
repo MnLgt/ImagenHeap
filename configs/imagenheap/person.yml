@@ -1,0 +1,31 @@
+components:
+  - name: DetectDino
+  - name: SegmentSam
+
+pipeline:
+  - detect
+  - segment
+
+dataset:
+  path: ronatello/personal
+
+batch_size: 10
+
+component_args:
+  detect:
+    text_prompt:
+      - hair
+      - face
+      - neck
+      - arm
+      - hand
+      - back
+      - leg
+      - foot
+      - outfit
+      - phone
+      - hat
+      - shoe
+    text_threshold: 0.4
+  segment:
+    return_tensors: true

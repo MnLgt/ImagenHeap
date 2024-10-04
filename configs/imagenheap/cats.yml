@@ -1,0 +1,21 @@
+components:
+  - name: DetectDino
+  - name: SegmentSam
+
+pipeline:
+  - detect
+  - segment
+
+dataset:
+  path: nekofura/person
+
+batch_size: 10
+
+component_args:
+  detect:
+    text_prompt:
+      - cat
+      - couch
+    text_threshold: 0.4
+  segment:
+    return_tensors: true

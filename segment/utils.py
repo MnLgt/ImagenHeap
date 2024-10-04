@@ -78,33 +78,6 @@ def get_device():
     return device
 
 
-# def unload_mask(mask):
-#     mask = mask.cpu().numpy().squeeze()
-#     mask = mask.astype(np.uint8) * 255
-#     return Image.fromarray(mask)
-
-
-def unload_mask(mask):
-    # permute the mask to the right order
-    mask = mask.permute(1, 2, 0)
-
-    mask = mask.cpu().numpy().squeeze()
-    mask = mask.astype(np.uint8) * 255
-    return Image.fromarray(mask).convert("L")
-
-
-def unload_box(box):
-    return box.cpu().numpy().tolist()
-
-
-def format_results(labels, scores, boxes, masks):
-    results_dict = []
-    for row in zip(labels, scores, boxes, masks):
-        label, score, mask, box = row
-        results_row = dict(label=label, score=score, mask=mask, box=box)
-        results_dict.append(results_row)
-    return results_dict
-
 
 def get_coco_style_polygons(mask):
     """
