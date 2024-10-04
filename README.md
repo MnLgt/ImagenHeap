@@ -85,7 +85,7 @@ pipeline:
   - segment
 
 dataset:
-  path: /workspace/SEGMENT/datasets/fashion_people_detection/images/train
+  path: /path/to/images or huggingface/dataset
 
 batch_size: 10
 
