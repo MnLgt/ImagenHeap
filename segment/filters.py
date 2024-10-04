@@ -2,7 +2,7 @@ from typing import Callable
 
 from datasets import Dataset
 
-from utilities.logger_config import get_logger
+from segment.utilities.logger_config import get_logger
 
 from typing import Callable
 

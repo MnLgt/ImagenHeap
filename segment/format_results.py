@@ -1,6 +1,9 @@
 from typing import List, Dict, Any
 from PIL import Image
 from segment.utils import unload_box, unload_mask, get_coco_style_polygons
+from segment.utilities.logger_config import get_logger
+
+logger = get_logger()
 
 
 class ResultFormatter:
@@ -57,32 +60,39 @@ class ResultFormatter:
 
         for img_idx in range(num_images):
             img_results = []
-            for item_idx in range(len(sam_results["boxes"][img_idx])):
-                result_row = {
-                    "image_index": img_idx,
-                    "box": formatted_boxes[img_idx][item_idx],
-                    "score": formatted_scores[img_idx][item_idx],
-                    "phrase": sam_results["phrases"][img_idx][item_idx],
-                }
+            for item_idx in range(len(sam_results["images"][img_idx])):
+                try:
+                    result_row = {
+                        "image_index": img_idx,
+                        "box": formatted_boxes[img_idx][item_idx],
+                        "score": formatted_scores[img_idx][item_idx],
+                        "phrase": sam_results["phrases"][img_idx][item_idx],
+                    }
 
-                if not no_masks:
-                    result_row.update({"mask": formatted_masks[img_idx][item_idx]})
-                    result_row.update(
-                        {"polygons": formatted_polygons[img_idx][item_idx]}
-                    )
+                    if not no_masks:
+                        result_row.update({"mask": formatted_masks[img_idx][item_idx]})
+                        result_row.update(
+                            {"polygons": formatted_polygons[img_idx][item_idx]}
+                        )
 
-                # Include any additional fields from sam_results
-                for key, value in sam_results.items():
-                    if key not in ["images", "masks", "boxes", "scores", "phrases"]:
-                        if key[-1] == "s":
-                            key = key[:-1]
-                        if isinstance(value[img_idx], list):
-                            result_row[key] = value[img_idx][item_idx]
-                        else:
-                            result_row[key] = value[img_idx]
+                    # Include any additional fields from sam_results
+                    for key, value in sam_results.items():
+                        if key not in ["images", "masks", "boxes", "scores", "phrases"]:
+                            if key[-1] == "s":
+                                key = key[:-1]
 
-                if result_row["box"] is not None:  # Only add results for valid entries
-                    img_results.append(result_row)
+                            if isinstance(value[img_idx], list):
+                                result_row[key] = value[img_idx][item_idx]
+                            else:
+                                result_row[key] = value[img_idx]
+
+                    if (
+                        result_row["box"] is not None
+                    ):  # Only add results for valid entries
+                        img_results.append(result_row)
+                except Exception as e:
+                    logger.error(f"Error formatting results: {e}")
+                    pass
 
             img_results = sorted(img_results, key=lambda x: x["phrase"])
             formatted_results.append(img_results)
