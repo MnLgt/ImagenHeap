@@ -7,7 +7,7 @@ import math
 from PIL import Image
 from segment.components.detect.DetectDino import DetectDino
 from segment.components.segment.SegmentSam import SegmentSam
-from segment.format_results import format_all_results
+from segment.format_results import ResultFormatter
 from segment.utils import *
 from segment.utils import get_device
 
@@ -66,6 +66,7 @@ class CreateSegmentationDataset:
         self.iou_threshold = iou_threshold
         self.image_size = image_size
         self.logger = self._setup_logger()
+        self.result_formatter = ResultFormatter() 
 
         # Initialize SegmentSam and DetectDino
         self.sam = SegmentSam()
@@ -139,7 +140,7 @@ class CreateSegmentationDataset:
 
         self.dino.reset()
 
-        return format_all_results(
+        return self.result_formatter.format_all_results(
             sam_results
         )  # Assuming format_all_results is imported or defined elsewhere
 

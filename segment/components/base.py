@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Union
 from PIL import Image
+import torch
 
 
 class Component(ABC):
@@ -27,9 +28,12 @@ class Component(ABC):
     def load_model(self):
         pass
 
-    @abstractmethod
     def unload_model(self):
-        pass
+        assert self.model is not None, "No model to unload"
+
+        del self.model
+        if self.device == "cuda":
+            torch.cuda.empty_cache()
 
     def configure(self, config: Dict[str, Any]) -> None:
         """

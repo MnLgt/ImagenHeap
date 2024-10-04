@@ -10,6 +10,16 @@ fi
 echo "Upgrading pip"
 pip install -U pip -qqq
 
+# Check if sudo is installed
+if ! command -v sudo &> /dev/null
+then
+    echo "sudo is not installed. Installing sudo..."
+    apt-get update && apt-get install -y sudo
+    echo "sudo has been installed."
+else
+    echo "sudo is already installed."
+fi
+
 if ! command -v git-lfs &> /dev/null
 then
     echo "git-lfs not found. Installing..."

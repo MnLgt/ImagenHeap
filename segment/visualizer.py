@@ -1,9 +1,38 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
+from matplotlib.gridspec import GridSpec
 from segment.utils import convert_coco_polygons_to_mask
 from PIL import Image
+import seaborn as sns
 
+def overlay_mask(image, mask, opacity=0.5):
+    """
+    Takes in a PIL image and a PIL boolean image mask. Overlay the mask on the image
+    and color the mask with a low opacity blue with hex #88CFF9.
+    """
+    # Convert the boolean mask to an image with alpha channel
+    alpha = mask.convert("L").point(lambda x: 255 if x == 255 else 0, mode="1")
+    
+    # Choose the color
+    r, g, b = (128, 0, 128)  # Purple color
+    
+    color_mask = Image.new("RGBA", mask.size, (r, g, b, int(opacity * 255)))
+    mask_rgba = Image.composite(
+        color_mask, Image.new("RGBA", mask.size, (0, 0, 0, 0)), alpha
+    )
+    
+    # Create a new RGBA image to overlay the mask on
+    overlay = Image.new("RGBA", image.size, (0, 0, 0, 0))
+    
+    # Paste the mask onto the overlay
+    overlay.paste(mask_rgba, (0, 0))
+    
+    # Create a new image to return by blending the original image and the overlay
+    result = Image.alpha_composite(image.convert("RGBA"), overlay)
+    
+    # Convert the result back to the original mode and return it
+    return result.convert(image.mode)
 
 def visualizer(
     image,
@@ -12,86 +41,90 @@ def visualizer(
     mask_label="mask",
     prompt_label="phrase",
     score_label="score",
-    cols=4,
-    **kwargs,
+    cols=3,
+    **kwargs
 ):
-    # Convert PIL Image to numpy array
-    image_np = np.array(image)
+    # Ensure image is a PIL Image
+    if not isinstance(image, Image.Image):
+        image = Image.fromarray(image)
 
-    # Check image dimensions
-    if image_np.ndim != 3:
-        raise ValueError("Image must be a 3-dimensional array")
+    # Ensure results is a list
+    if not isinstance(results, list):
+        results = [results]
 
     # Number of results
     n = len(results)
 
     # If there are fewer images than cols, set cols to n
-    cols = cols if cols <= n else n
+    cols = min(cols, n)
+    rows = (n + cols - 1) // cols
 
-    rows = (n + cols - 1) // cols  # Calculate required number of rows
+    # Set up the plot with a dark background
+    plt.style.use('dark_background')
+    fig = plt.figure(figsize=(6 * cols, 6 * rows + 1))
+    gs = GridSpec(rows, cols, figure=fig)
 
-    # Setting up the plot
-    fig, axs = plt.subplots(rows, cols, figsize=(5 * cols, 5 * rows))
-    if n == 1:
-        axs = np.array([[axs]])
-    elif rows == 1:
-        axs = np.array([axs])
-    else:
-        axs = axs.reshape(rows, cols)
+    # Use a modern color palette
+    colors = sns.color_palette("husl", n_colors=8)
 
     for i, result in enumerate(results):
-        label = result[prompt_label]
-        score = float(result[score_label])
-
         row = i // cols
         col = i % cols
 
         # Create a copy of the original image
-        combined = image_np.copy()
+        combined = image.copy()
+
+        # Handle polygon to mask conversion
         if mask_label not in result and "polygons" in result:
             polygons = result["polygons"]
-            mask = convert_coco_polygons_to_mask(polygons, 1024, 1024)
-            mask_image = Image.fromarray(mask)
-            result[mask_label] = mask_image
+            mask = convert_coco_polygons_to_mask(polygons, image.height, image.width)
+            result[mask_label] = Image.fromarray(mask)
 
         # Draw mask if present
         if mask_label in result:
             mask = result[mask_label]
-            # Convert PIL mask to numpy array
-            mask_np = np.array(mask)
+            if not isinstance(mask, Image.Image):
+                mask = Image.fromarray(mask)
+            
+            # Ensure mask size matches image size
+            if mask.size != image.size:
+                print(f"Warning: Mask size {mask.size} doesn't match image size {image.size}. Resizing mask.")
+                mask = mask.resize(image.size)
 
-            # Check mask dimensions
-            if mask_np.ndim != 2:
-                raise ValueError("Mask must be a 2-dimensional array")
+            # Apply the overlay
+            combined = overlay_mask(combined, mask)
 
-            # Create an overlay where mask is True
-            overlay = np.zeros_like(image_np)
-            overlay[mask_np > 0] = [0, 0, 255]  # Applying blue color on the mask area
+        # Convert to numpy array for matplotlib
+        combined_np = np.array(combined)
 
-            # Combine the image and the overlay
-            indices = np.where(mask_np > 0)
-            combined[indices] = combined[indices] * 0.5 + overlay[indices] * 0.5
-
-        # Show the combined image
-        ax = axs[row, col]
-        ax.imshow(combined)
+        # Create subplot
+        ax = fig.add_subplot(gs[row, col])
+        ax.imshow(combined_np)
         ax.axis("off")
-        ax.set_title(f"Label: {label}, Score: {score:.2f}", fontsize=12)
 
         # Draw bounding box if present
         if box_label in result:
             bbox = result[box_label]
             x1, y1, x2, y2 = bbox
             rect = patches.Rectangle(
-                (x1, y1), x2 - x1, y2 - y1, linewidth=2, edgecolor="r", facecolor="none"
+                (x1, y1), x2 - x1, y2 - y1, linewidth=2, 
+                edgecolor=colors[i % len(colors)], facecolor="none"
             )
             ax.add_patch(rect)
 
-    # Hide unused subplots if the total number of results is not a multiple of cols
-    for idx in range(i + 1, rows * cols):
-        row = idx // cols
-        col = idx % cols
-        axs[row, col].axis("off")
+        # Add metadata as an inset
+        metadata = {k: v for k, v in result.items() if k not in [mask_label, box_label, 'polygons']}
+        if score := metadata.get('score',None):
+            metadata['score'] = f"{score:.2f}"
+            
+        metadata_text = "\n".join([f"{key.title()}: {value}" for key, value in metadata.items()])
+        
+        # Create an inset axes for the metadata
+        inset_ax = ax.inset_axes([0.05, 0.05, 0.9, 0.2])
+        inset_ax.axis("off")
+        inset_ax.text(0, 0, metadata_text, fontsize=14, color='white', linespacing=1.5,
+                      bbox=dict(facecolor='black', alpha=0.7, edgecolor='none', pad=5))
 
-    plt.tight_layout()
+    # Adjust layout and display
+    plt.tight_layout(rect=[0, 0.03, 1, 0.95])
     plt.show()

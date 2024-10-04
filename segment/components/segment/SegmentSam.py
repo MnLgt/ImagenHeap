@@ -1,7 +1,7 @@
 import os
 import warnings
 from functools import lru_cache
-from typing import List, Tuple, Dict, Any
+from typing import List, Tuple, Dict, Any, Union
 
 import numpy as np
 import torch
@@ -34,17 +34,14 @@ class SegmentSam(Component):
         super().__init__("segment")
         self.weights_dir = weights_dir
         self.device = device or get_device()
-        self.model = self.load_model()
+        self.model = None
         self.transform = ResizeLongestSide(1024)
 
     @lru_cache(maxsize=1)
     def load_model(self):
         sam_checkpoint = os.path.join(self.weights_dir, "sam_vit_h_4b8939.pth")
         sam = build_sam(checkpoint=sam_checkpoint)
-        return sam.to(device=self.device)
-
-    def unload_model(self):
-        del self.model
+        self.model = sam.to(device=self.device)
 
     def transform_image(self, image: Image.Image) -> torch.Tensor:
         if isinstance(image, Image.Image):
@@ -81,6 +78,7 @@ class SegmentSam(Component):
         ]
         return self.model(batched_input, multimask_output=multimask_output)
 
+    @torch.no_grad()
     def _process(
         self,
         boxes: List[torch.Tensor],
@@ -89,19 +87,18 @@ class SegmentSam(Component):
         image_sizes: List[Tuple[int, int]],
         multimask_output: bool = False,
         **kwargs,
-    ) -> List[Dict]:
-
+    ) -> Dict[str, List]:
         assert len(boxes) == len(phrases), "Boxes and phrases must be provided together"
         batch_size = sam_images.size(0)
 
         # Create a mask for valid (non-empty) boxes
         valid_mask = torch.tensor([box.numel() > 0 for box in boxes], dtype=torch.bool)
 
-        # Initialize output with None dictionaries for all entries
-        output = [
-            {"masks": None, "boxes": None, "scores": None, "phrases": None}
-            for _ in range(batch_size)
-        ]
+        # Initialize output lists
+        output_masks = [None] * batch_size
+        output_boxes = [None] * batch_size
+        output_scores = [None] * batch_size
+        output_phrases = [None] * batch_size
 
         if valid_mask.any():
             # Process only valid entries
@@ -129,14 +126,18 @@ class SegmentSam(Component):
             for i, (mask, box, score, phrase) in enumerate(
                 zip(valid_masks, valid_boxes, valid_scores, valid_phrases)
             ):
-                output[valid_indices[i].item()] = {
-                    "masks": mask,
-                    "boxes": box,
-                    "scores": score,
-                    "phrases": phrase,
-                }
+                index = valid_indices[i].item()
+                output_masks[index] = mask
+                output_boxes[index] = box
+                output_scores[index] = score
+                output_phrases[index] = phrase
 
-        return output
+        return {
+            "masks": output_masks,
+            "boxes": output_boxes,
+            "scores": output_scores,
+            "phrases": output_phrases,
+        }
 
     @torch.no_grad()
     def process(self, data: Dict[str, Any]) -> Dict[str, Any]:
@@ -158,4 +159,5 @@ class SegmentSam(Component):
         ).to(self.device)
 
         results = self._process(boxes, phrases, sam_images, image_sizes, **data)
+        results["images"] = images  # Add original images to the results
         return results

@@ -38,18 +38,15 @@ class DetectDino(Component):
     def __init__(self, weights_dir: str = WEIGHTS_DIR, device: str = None):
         super().__init__("detect")
         self.weights_dir = weights_dir
-        self.device = device or self._get_device()
-        self.model = self.load_model()
+        self.device = device or get_device()
+        self.model = None
         self.transform = self._get_transform()
         self.boxes = []
         self.scores = []
         self.tokens = []
         self.phrases = []
 
-    @staticmethod
-    def _get_device() -> str:
-        return get_device()
-
+    @lru_cache(maxsize=1)
     def load_model(self):
         config_path = DINO_CONFIG
         checkpoint_path = DINO_CHECKPOINT
@@ -65,10 +62,7 @@ class DetectDino(Component):
         print(f"Model loading result: {load_result}")
 
         model.eval()
-        return model.to(self.device)
-
-    def unload_model(self):
-        del self.model
+        self.model = model.to(self.device)
 
     def _get_transform(self):
         return T.Compose(
