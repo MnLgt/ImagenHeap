@@ -26,5 +26,8 @@ component_args:
       - phone
       - hat
       - shoe
+    box_threshold: 0.3
+    text_threshold: 0.25
+    iou_threshold: 0.8
   segment:
     return_tensors: true
