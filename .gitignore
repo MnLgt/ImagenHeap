@@ -56,3 +56,7 @@ human_parsing_test/
 yolo_train.py
 models/yolo-human-parse
 yolo-human-parse/
+
+
+# Dont Ignore 
+!assets/*.png
