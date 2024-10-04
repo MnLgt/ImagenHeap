@@ -21,23 +21,27 @@ from imagenheap.utils import get_device
 from imagenheap.components.base import Component
 from imagenheap.utils import load_resize_image, load_image
 import logging
+from imagenheap.utils import get_weight_path
 
 logger = logging.getLogger(__name__)
 
-# jupyter
-CURDIR = os.path.dirname(__file__)
-
-WEIGHTS_DIR = os.path.join(CURDIR, "..", "..", "..", "weights")
 
 # Dino
-DINO_CHECKPOINT = os.path.join(WEIGHTS_DIR, "groundingdino_swint_ogc.pth")
+DINO_CHECKPOINT = get_weight_path("groundingdino")
 DINO_CONFIG = GroundingDINO_SwinT_OGC.__file__
 
 
 class DetectDino(Component):
-    def __init__(self, weights_dir: str = WEIGHTS_DIR, device: str = None):
+
+    def __init__(
+        self,
+        dino_checkpoint: str = DINO_CHECKPOINT,
+        dino_config: str = DINO_CONFIG,
+        device: str = None,
+    ):
         super().__init__("detect")
-        self.weights_dir = weights_dir
+        self.dino_config = dino_config
+        self.dino_checkpoint = dino_checkpoint
         self.device = device or get_device()
         self.model = None
         self.transform = self._get_transform()
@@ -48,14 +52,12 @@ class DetectDino(Component):
 
     def load_model(self):
         if self.model is None:
-            checkpoint_path = DINO_CHECKPOINT
-
-            args = SLConfig.fromfile(DINO_CONFIG)
+            args = SLConfig.fromfile(self.dino_config)
             args.device = self.device
 
             model = build_model(args)
             checkpoint = torch.load(
-                checkpoint_path, map_location="cpu", weights_only=True
+                self.dino_checkpoint, map_location="cpu", weights_only=True
             )
             load_result = model.load_state_dict(
                 clean_state_dict(checkpoint["model"]), strict=False

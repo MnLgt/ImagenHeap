@@ -1,0 +1,55 @@
+[build-system]
+requires = ["setuptools>=45", "setuptools_scm[toml]>=6.2"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "imagenheap"
+authors = [
+    {name = "Jordan Davis", email = "jordandavis16@gmail.com"},
+]
+description = "ImagenHeap is a powerful Python package designed for chaining image processing models to efficiently process images from datasets. It provides a flexible and extensible framework for creating custom image processing pipelines."
+readme = "README.md"
+requires-python = ">=3.7"
+license = {text = "MIT"}
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "blessed==1.20.0",
+    "datasets==3.0.1",
+    "diffusers==0.30.3",
+    "GPUtil==1.4.0",
+    "huggingface_hub==0.25.1",
+    "loguru==0.7.2",
+    "matplotlib==3.9.2",
+    "numpy==1.25.2",
+    "pandas==2.2.3",
+    "Pillow==10.4.0",
+    "psutil==6.0.0",
+    "python-dotenv==1.0.1",
+    "PyYAML==6.0.2",
+    "Requests==2.32.3",
+    "segment_anything==1.0",
+    "setuptools==75.1.0",
+    "torch==2.4.1",
+    "torchvision==0.19.1",
+    "tqdm==4.66.5",
+    "transformers==4.45.1",
+    "groundingdino @ git+https://github.com/IDEA-Research/GroundingDINO.git",
+
+]
+dynamic = ["version"]
+
+[project.optional-dependencies]
+dev = [
+    "wandb==0.18.3",
+    "pytest",
+    "black",
+]
+
+[project.urls]
+Home = "https://github.com/MnLgt/ImagenHeap"
+
+[tool.setuptools_scm]

@@ -10,6 +10,29 @@ import torch
 from PIL import Image, ImageOps, ImageDraw
 from torchvision.transforms import functional as F
 import requests
+from pathlib import Path
+from imagenheap.config import DEFAULT_WEIGHTS_DIR, GROUNDINGDINO_WEIGHTS, SAM_WEIGHTS
+
+
+def get_weight_path(weight_name: str) -> Path:
+    """
+    Get the full path for a weight file.
+
+    Args:
+        weight_name (str): Name of the weight file.
+
+    Returns:
+        Path: Full path to the weight file.
+
+    Raises:
+        ValueError: If the weight_name is not recognized.
+    """
+    if weight_name == "groundingdino":
+        return DEFAULT_WEIGHTS_DIR / GROUNDINGDINO_WEIGHTS
+    elif weight_name == "sam":
+        return DEFAULT_WEIGHTS_DIR / SAM_WEIGHTS
+    else:
+        raise ValueError(f"Unknown weight name: {weight_name}")
 
 
 def load_image(
@@ -76,7 +99,6 @@ def get_device():
     else:
         device = "cpu"
     return device
-
 
 
 def get_coco_style_polygons(mask):
