@@ -21,7 +21,7 @@ cd ImagenHeap
 pip install -e .
 ```
 
-## Download MOdels 
+## Download Models 
 ```bash
 cd src/imagenheap
 
