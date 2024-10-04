@@ -21,6 +21,12 @@ cd ImagenHeap
 pip install -e .
 ```
 
+## Download MOdels 
+```bash
+cd src/imagenheap
+
+python download_models.py
+```
 ## Quick Start
 
 1. Import the ImagenHeap class:
