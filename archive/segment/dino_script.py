@@ -28,8 +28,8 @@ from GroundingDINO.groundingdino.util.utils import (
 from PIL import Image
 
 from SEGMENT.archive.segment.sam_results import format_boxes, format_scores
-from segment.utils import get_device, image_handler, load_resize_image
-from segment.visualizer import visualizer
+from imagenheap.utils import get_device, image_handler, load_resize_image
+from imagenheap.visualizer import visualizer
 from typing import Union
 from transformers import PreTrainedTokenizerBase
 from segment.components.inputs import ImageInput
@@ -255,7 +255,7 @@ def run_dino(
 
 import torch
 import torchvision
-from segment.utilities.box_rescaler import BoxRescaler, BoxFormat, CoordinateSystem
+from imagenheap.utilities.box_rescaler import BoxRescaler, BoxFormat, CoordinateSystem
 
 # def rescale_boxes(boxes, original_size, max_image_side=1024):
 #     original_w, original_h = original_size

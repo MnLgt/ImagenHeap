@@ -5,11 +5,11 @@ import numpy as np
 from tqdm.auto import tqdm
 import math
 from PIL import Image
-from segment.components.detect.DetectDino import DetectDino
-from segment.components.segment.SegmentSam import SegmentSam
-from segment.format_results import ResultFormatter
-from segment.utils import *
-from segment.utils import get_device
+from imagenheap.components.detect.DetectDino import DetectDino
+from imagenheap.components.segment.SegmentSam import SegmentSam
+from imagenheap.format_results import ResultFormatter
+from imagenheap.utils import *
+from imagenheap.utils import get_device
 
 
 class CreateSegmentationDataset:

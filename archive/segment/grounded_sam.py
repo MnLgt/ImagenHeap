@@ -34,7 +34,7 @@ from PIL import Image
 # segment anything
 from segment_anything import build_sam
 from segment_anything.utils.transforms import ResizeLongestSide
-from segment.utils import get_device
+from imagenheap.utils import get_device
 
 # This was the first attempt at marrying the groundingdino model with the sam model
 # We separated out the dino and sam logic into separate scripts for cleaner implementation

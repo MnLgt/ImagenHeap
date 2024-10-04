@@ -1,6 +1,6 @@
 from typing import Dict, Any, List
 from PIL import Image
-from segment.components.base import Component
+from imagenheap.components.base import Component
 
 InputRequirements = {"images": List[Image.Image]}
 

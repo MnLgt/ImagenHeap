@@ -16,10 +16,10 @@ import groundingdino.datasets.transforms as T
 from groundingdino.config import GroundingDINO_SwinT_OGC
 
 
-from segment.utilities.box_rescaler import BoxRescaler, BoxFormat, CoordinateSystem
-from segment.utils import get_device
-from segment.components.base import Component
-from segment.utils import load_resize_image, load_image
+from imagenheap.utilities.box_rescaler import BoxRescaler, BoxFormat, CoordinateSystem
+from imagenheap.utils import get_device
+from imagenheap.components.base import Component
+from imagenheap.utils import load_resize_image, load_image
 import logging
 
 logger = logging.getLogger(__name__)

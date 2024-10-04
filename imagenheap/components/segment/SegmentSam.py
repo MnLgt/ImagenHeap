@@ -8,9 +8,9 @@ import torch
 from PIL import Image
 from segment_anything import build_sam
 from segment_anything.utils.transforms import ResizeLongestSide
-from segment.utils import get_device
-from segment.utils import load_resize_image
-from segment.components.base import Component
+from imagenheap.utils import get_device
+from imagenheap.utils import load_resize_image
+from imagenheap.components.base import Component
 import logging 
 
 logger = logging.getLogger(__name__)

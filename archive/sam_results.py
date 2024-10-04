@@ -1,6 +1,6 @@
 import numpy as np
 
-from SEGMENT.segment.utils import (display_image_with_masks, unload_box,
+from SEGMENT.imagenheap.utils import (display_image_with_masks, unload_box,
                                    unload_mask)
 
 

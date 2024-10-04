@@ -4,15 +4,15 @@ from typing import Any, Dict, List, Union
 import yaml
 
 from datasets import Dataset
-from segment.components.detect.DetectDino import DetectDino
-from segment.components.segment.SegmentSam import SegmentSam
-from segment.components.base import Component
-from segment.components.component_manager import ComponentManager
-from segment.components.data_manager import DataManager
-from segment.components.training_manager import TrainingManager
-from segment.format_results import ResultFormatter
-from segment.utilities.logger_config import get_logger
-from segment.visualizer import visualizer
+from imagenheap.components.detect.DetectDino import DetectDino
+from imagenheap.components.segment.SegmentSam import SegmentSam
+from imagenheap.components.base import Component
+from imagenheap.components.component_manager import ComponentManager
+from imagenheap.components.data_manager import DataManager
+from imagenheap.components.training_manager import TrainingManager
+from imagenheap.format_results import ResultFormatter
+from imagenheap.utilities.logger_config import get_logger
+from imagenheap.visualizer import visualizer
 
 logger = get_logger()
 
@@ -114,7 +114,7 @@ class ImagenHeap:
             )
         return self.formatted_results
 
-    def visualize(self, index: int = None, **kwargs):
+    def visualize(self, index: int = None, cols=3, **kwargs):
         if index is None:
             index = random.randint(0, len(self.images) - 1)
 
@@ -126,13 +126,12 @@ class ImagenHeap:
         image = self.images[index]
         result = self.formatted_results[index]
 
-        cols = 4
         num_items = len(result)
         if num_items == 0:
             logger.warning("No items detected in the image.")
             return
-        elif num_items < 4:
-            cols = num_items
+        else:
+            cols = min(cols, num_items)
 
         visualizer(image, result, cols=cols, **kwargs)
 

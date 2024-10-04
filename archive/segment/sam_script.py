@@ -20,7 +20,7 @@ from segment_anything import build_sam
 from segment_anything.utils.transforms import ResizeLongestSide
 
 from SEGMENT.archive.segment.dino_script import DinoDetector
-from segment.utils import get_device, load_resize_image
+from imagenheap.utils import get_device, load_resize_image
 
 DEVICE = get_device()
 

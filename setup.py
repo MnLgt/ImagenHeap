@@ -6,11 +6,11 @@ with open("requirements.txt", "r") as f:
     requirements = f.read().splitlines()
 
 setup(
-    name="segment",
+    name="imagenheap",
     version="0.1",
     packages=find_packages(),
     description="Scripts for manipulating imaegs",
-    url="https://github.com/MnLgt/SEGMENT",
+    url="https://github.com/MnLgt/ImagenHeap",
     author="Jordan Davis",
     author_email="jordandavis16@gmail.com",
     license="MIT",

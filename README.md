@@ -1,4 +1,5 @@
 # ImagenHeap
+![Image](assets/example_output.png)
 
 ImagenHeap is a powerful Python package designed for chaining image processing models to efficiently process images from datasets. It provides a flexible and extensible framework for creating custom image processing pipelines.
 
@@ -13,7 +14,11 @@ ImagenHeap is a powerful Python package designed for chaining image processing m
 ## Installation
 
 ```bash
-pip install imagenheap
+git clone https://github.com/MnLgt/ImagenHeap.git
+
+cd ImagenHeap
+
+pip install -e .
 ```
 
 ## Quick Start

@@ -12,7 +12,7 @@ from PIL import Image
 
 sys.path.append("..")
 from utilities.convert.coco_to_yolo.coco_to_yolo import coco_to_yolo
-from segment.utilities.logger_config import get_logger
+from imagenheap.utilities.logger_config import get_logger
 
 logger = get_logger()
 

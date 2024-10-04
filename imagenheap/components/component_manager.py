@@ -1,8 +1,8 @@
 import torch
 from typing import Dict, Any, List, Callable, Set
 from tqdm.auto import tqdm
-from segment.components.base import Component
-from segment.utilities.logger_config import get_logger
+from imagenheap.components.base import Component
+from imagenheap.utilities.logger_config import get_logger
 
 logger = get_logger()
 

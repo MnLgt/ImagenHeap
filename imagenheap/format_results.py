@@ -1,6 +1,6 @@
 import torch
 from typing import List, Dict, Any
-from segment.utils import get_coco_style_polygons
+from imagenheap.utils import get_coco_style_polygons
 from PIL import Image
 import numpy as np
 

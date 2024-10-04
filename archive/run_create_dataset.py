@@ -3,10 +3,10 @@ import sys
 sys.path.append("..")
 
 import os
-from segment.create_dataset import CreateSegmentationDataset, get_labels_dict
-from segment.utils import get_device
+from imagenheap.create_dataset import CreateSegmentationDataset, get_labels_dict
+from imagenheap.utils import get_device
 from datasets import load_dataset
-from segment.create_dataset import filter_list_in_column
+from imagenheap.create_dataset import filter_list_in_column
 from dotenv import load_dotenv, find_dotenv
 
 load_dotenv(find_dotenv())

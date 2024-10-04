@@ -1,8 +1,8 @@
 import numpy as np
 from PIL import ImageDraw
 
-from segment.utils import get_coco_style_polygons, unload_box, unload_mask
-from segment.visualizer import visualizer
+from imagenheap.utils import get_coco_style_polygons, unload_box, unload_mask
+from imagenheap.visualizer import visualizer
 from itertools import groupby
 from operator import itemgetter
 
